@@ -269,6 +269,6 @@ class TestStructuralSearchEndpoint:
             expected_fields = {
                 "id", "movie_name", "rating", "runtime", "genre", 
                 "metascore", "plot", "directors", "stars", "votes", 
-                "gross", "poster_url"
+                "gross", "poster_url", "similarity_score"
             }
             assert set(movie.keys()) == expected_fields
