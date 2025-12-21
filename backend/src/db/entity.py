@@ -1,3 +1,4 @@
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, Float, Integer, String, Text
 
 from .core import Base
@@ -18,6 +19,7 @@ class Movie(Base):
     votes = Column(String(20), nullable=True)
     gross = Column(String(20), nullable=True)
     poster_url = Column(Text, nullable=True)
+    plot_embedding = Column(Vector(384), nullable=True)
 
     def __repr__(self):
         """Provides a helpful representation of the Movie object."""

@@ -16,7 +16,9 @@ dependencies = [
     "loguru",
     "flower",
     "pandas",
-    "python-dotenv"
+    "python-dotenv",
+    "sentence-transformers>=5.2.0",
+    "pgvector>=0.4.2",
 ]
 
 [dependency-groups]

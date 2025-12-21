@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16-trixie
     container_name: db_postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -27,3 +27,4 @@ volumes:
     driver: local
   redis_data:
     driver: local
+
