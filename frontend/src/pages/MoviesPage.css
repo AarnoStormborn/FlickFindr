@@ -1,0 +1,137 @@
+/* ========================================
+   Movies Page Styles
+   ======================================== */
+
+.movies-page {
+    min-height: 100vh;
+    padding-top: var(--navbar-height);
+}
+
+/* Hero Section */
+.movies-hero {
+    position: relative;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg,
+            #1a1a2e 0%,
+            #16213e 50%,
+            #0f3460 100%);
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+}
+
+.movies-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 20% 50%, rgba(245, 197, 24, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(0, 168, 225, 0.1) 0%, transparent 50%);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 0 var(--space-lg);
+}
+
+.hero-title {
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+    line-height: 1.2;
+}
+
+.hero-highlight {
+    display: inline;
+    background: linear-gradient(135deg, var(--accent-gold) 0%, #ffd700 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.hero-subtitle {
+    font-size: var(--font-size-lg);
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.hero-gradient {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to top, var(--bg-primary), transparent);
+    z-index: 1;
+}
+
+/* Categories Container */
+.movies-categories {
+    padding: 0 10%;
+}
+
+/* Error State */
+.movies-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    padding: var(--space-xl);
+}
+
+.movies-error h2 {
+    font-size: var(--font-size-2xl);
+    margin-bottom: var(--space-md);
+    color: var(--text-primary);
+}
+
+.movies-error p {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-lg);
+}
+
+.movies-error button {
+    padding: var(--space-md) var(--space-xl);
+    background: var(--accent-gold);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.movies-error button:hover {
+    background: #ffd700;
+    transform: scale(1.02);
+}
+
+/* Footer Spacing */
+.movies-footer-space {
+    height: var(--space-2xl);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .movies-hero {
+        height: 220px;
+        margin-bottom: var(--space-lg);
+    }
+
+    .hero-subtitle {
+        font-size: var(--font-size-base);
+    }
+
+    .movies-categories {
+        padding: 0 5%;
+    }
+}

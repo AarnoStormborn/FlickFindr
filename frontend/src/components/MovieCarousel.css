@@ -1,0 +1,128 @@
+/* ========================================
+   Movie Carousel Styles
+   ======================================== */
+
+.movie-carousel {
+    position: relative;
+    width: 100%;
+}
+
+.carousel-track {
+    display: flex;
+    gap: var(--space-md);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding: var(--space-lg);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: var(--space-sm) 0 var(--space-md) 0;
+}
+
+.carousel-track::-webkit-scrollbar {
+    display: none;
+}
+
+.carousel-track>* {
+    scroll-snap-align: start;
+}
+
+/* Navigation Arrows */
+.carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    background: rgba(15, 23, 30, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all var(--transition-normal);
+    z-index: 20;
+    backdrop-filter: blur(8px);
+}
+
+.carousel-arrow.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.carousel-arrow:hover {
+    background: var(--bg-hover);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-arrow-left {
+    left: var(--space-sm);
+}
+
+.carousel-arrow-right {
+    right: var(--space-sm);
+}
+
+/* Gradient Edges */
+.carousel-gradient {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+    z-index: 10;
+}
+
+.carousel-gradient.visible {
+    opacity: 1;
+}
+
+.carousel-gradient-left {
+    left: 0;
+    background: linear-gradient(to right, var(--bg-primary), transparent);
+}
+
+.carousel-gradient-right {
+    right: 0;
+    background: linear-gradient(to left, var(--bg-primary), transparent);
+}
+
+/* Empty State */
+.movie-carousel-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 270px;
+    color: var(--text-muted);
+    font-size: var(--font-size-base);
+}
+
+/* Skeleton Loading */
+.movie-card-skeleton {
+    flex-shrink: 0;
+    width: 180px;
+}
+
+.skeleton-poster {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    border-radius: var(--card-radius-lg);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .carousel-track {
+        gap: var(--space-sm);
+    }
+
+    .carousel-arrow {
+        width: 36px;
+        height: 36px;
+    }
+}
