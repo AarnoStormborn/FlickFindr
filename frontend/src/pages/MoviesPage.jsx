@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CategoryRow from '../components/CategoryRow';
-import { getGenres, getMoviesByGenre } from '../api/movies';
+import { getMoviesByGenre } from '../api/movies';
 import './MoviesPage.css';
 
 // Categories to display - curated list for best experience
@@ -97,7 +97,7 @@ export default function MoviesPage() {
 
             {/* Category Rows */}
             <div className="movies-categories">
-                {FEATURED_GENRES.map((genre, index) => (
+                {FEATURED_GENRES.map((genre) => (
                     <CategoryRow
                         key={genre.name}
                         title={genre.displayName}

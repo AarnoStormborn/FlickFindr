@@ -18,11 +18,6 @@ export default function Navbar() {
                         </a>
                     </li>
                     <li className="navbar-item">
-                        <a href="/movies" className="navbar-link">
-                            Movies
-                        </a>
-                    </li>
-                    <li className="navbar-item">
                         <a href="/search" className="navbar-link">
                             Search
                         </a>
@@ -31,7 +26,7 @@ export default function Navbar() {
 
                 {/* Right Side - Search & Profile */}
                 <div className="navbar-actions">
-                    <button className="navbar-search-btn" aria-label="Search">
+                    <a href="/search" className="navbar-search-btn" aria-label="Search">
                         <svg
                             width="20"
                             height="20"
@@ -43,7 +38,7 @@ export default function Navbar() {
                             <circle cx="11" cy="11" r="8" />
                             <path d="m21 21-4.35-4.35" />
                         </svg>
-                    </button>
+                    </a>
                     <div className="navbar-profile">
                         <span className="profile-avatar">👤</span>
                     </div>

@@ -11,12 +11,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ingest": "tsx scripts/ingest-csv.ts",
-    "embeddings": "tsx scripts/generate-embeddings.ts"
+    "embeddings": "tsx scripts/generate-embeddings.ts",
+    "init:db": "tsx scripts/init-db.ts",
+    "check": "tsx scripts/check.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.84.3",
     "@fastify/cors": "^11.0.1",
     "@huggingface/transformers": "^4.2.0",
+    "csv-parse": "^7.0.2",
     "dotenv": "^17.2.3",
     "fastify": "^5.12.1",
     "pg": "^8.23.0",

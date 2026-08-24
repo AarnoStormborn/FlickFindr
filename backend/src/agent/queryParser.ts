@@ -28,6 +28,8 @@ movie search request into a single JSON object with ONLY these fields (omit any 
 Rules:
 - "query" must be short (5-15 words) and capture the plot/theme intent, e.g. "prison escape and friendship".
 - Do not include genre/rating words inside "query" if they are already extracted as filters.
+- Extract genre / director / actor names EXACTLY as the user phrased them (verbatim substrings).
+  Do not invent names, do not add or remove spaces or commas, and output null when uncertain.
 - Respond with the JSON object only. No markdown fences, no prose.`;
 
 /** Best-effort extraction of the final assistant text from a session's messages. */

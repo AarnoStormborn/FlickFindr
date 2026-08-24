@@ -39,26 +39,40 @@ src/
 ## Setup
 
 ```bash
-docker compose up -d          # postgres+pgvector, redis (healthchecked)
+docker compose up -d          # postgres+pgvector (:5433), redis (:6380) — healthchecked
 cp .env.example .env          # adjust as needed (dev defaults work with compose)
 npm install
 
-# 1. ingest a CSV  (npm run ingest -- <file.csv>)
-# 2. vectorize    (npm run embeddings)
-# 3. run          (npm run dev  → http://localhost:8001)
+# 1. schema     (npm run init:db   — pgvector extension + movies table)
+# 2. ingest     (npm run ingest -- <file.csv>)
+# 3. vectorize  (npm run embeddings)
+# 4. run        (npm run dev  → http://localhost:8001)
 ```
 
 No `.env` is required at boot — config ships dev defaults matching
 `docker-compose.yml`.
+
+| Script | Purpose |
+|--------|---------|
+| `npm run dev` | tsx watch server (:8001) |
+| `npm run build` / `start` | compile + run dist |
+| `npm test` / `typecheck` | vitest suite / tsc --noEmit |
+| `npm run init:db` | pgvector extension + movies table (idempotent) |
+| `npm run ingest -- <csv>` | load movies CSV (quote-aware) |
+| `npm run embeddings` | batch plot embeddings → plot_embedding |
+| `npm run check` | env/catalog/agent health report |
 
 ## Agent mode
 
 - `AGENT_ENABLED=true` (default): `POST /search/semantic` and `/search/hybrid`
   first run the query through a Pi agent that extracts filters/intent, then
   execute the search. `/chat` streams an assistant over SSE.
-- `AGENT_ENABLED=false`: embedding-only search, no chat route.
+- Hybrid search relaxes categorical filters (genre/directors/stars) when the
+  strict conjunction returns nothing, so users always get ranked results.
 - The agent uses `~/.pi/agent/auth.json` credentials via `ModelRuntime`;
   `PI_MODEL` pins a specific model, and timeouts are configurable.
+- **Status: live-verified end-to-end** — query parsing, tool-using chat,
+  SSE streaming all confirmed against a seeded local catalog.
 
 ## API
 

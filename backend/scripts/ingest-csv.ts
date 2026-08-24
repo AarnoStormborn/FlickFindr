@@ -8,6 +8,7 @@
  */
 
 import fs from "node:fs";
+import { parse } from "csv-parse/sync";
 import { getPool, closePool } from "../src/db/pool.js";
 import { logger } from "../src/logger.js";
 
@@ -26,20 +27,13 @@ const COLUMNS = [
 ] as const;
 
 function parseCsv(text: string): Record<string, string>[] {
-  const lines = text.trim().split(/\r?\n/);
-  const [headerLine, ...rows] = lines;
-  if (!headerLine) return [];
-  const headers = headerLine.split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-  return rows
-    .filter((l) => l.trim())
-    .map((line) => {
-      const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
-      const record: Record<string, string> = {};
-      headers.forEach((h, i) => {
-        record[h] = values[i] ?? "";
-      });
-      return record;
-    });
+  return parse(text, {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    relax_quotes: true,
+    skip_records_with_empty_values: false,
+  }) as Record<string, string>[];
 }
 
 async function main(): Promise<void> {

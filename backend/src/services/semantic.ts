@@ -57,7 +57,9 @@ export const semanticService = {
 
   /**
    * Hybrid search: structural filters ANDed into the pgvector query,
-   * results ranked by semantic similarity.
+   * results ranked by semantic similarity. Falls back to relaxing
+   * categorical filters (genre/directors/stars) when the strict
+   * conjunction returns no rows.
    */
   async hybridSearch(
     db: Queryable,
@@ -68,33 +70,47 @@ export const semanticService = {
       const embedding = await getEmbedding(req.query);
       const vec = `[${embedding.join(",")}]`;
 
-      const where: string[] = ["plot_embedding IS NOT NULL"];
-      const params: unknown[] = [vec];
+      const run = async (useCategorical: boolean): Promise<{ movies: MovieResult[]; usedFilters: boolean }> => {
+        const where: string[] = ["plot_embedding IS NOT NULL"];
+        const params: unknown[] = [vec];
+        const addFilter = (column: string, value: unknown, op = "ILIKE", pattern = false) => {
+          if (value === undefined || value === null) return;
+          params.push(pattern ? `%${value}%` : value);
+          where.push(`${column} ${op} $${params.length}`);
+        };
+        if (useCategorical) {
+          addFilter("genre", req.genre, "ILIKE", true);
+          addFilter("directors", req.directors, "ILIKE", true);
+          addFilter("stars", req.stars, "ILIKE", true);
+        }
+        addFilter("rating", req.min_rating, ">=");
+        addFilter("rating", req.max_rating, "<=");
+        addFilter("runtime", req.min_runtime, ">=");
+        addFilter("runtime", req.max_runtime, "<=");
 
-      const addFilter = (column: string, value: unknown, op = "ILIKE", pattern = false) => {
-        if (value === undefined || value === null) return;
-        params.push(pattern ? `%${value}%` : value);
-        where.push(`${column} ${op} $${params.length}`);
+        params.push(req.limit);
+        const sql = `SELECT ${SIMILARITY_SELECT}
+          FROM movies
+          WHERE ${where.join(" AND ")}
+          ORDER BY plot_embedding <=> CAST($1 AS vector)
+          LIMIT $${params.length}`;
+
+        const { rows } = await db.query(sql, params);
+        return { movies: rows.map(toSemanticResult), usedFilters: where.length > 1 };
       };
-      addFilter("genre", req.genre, "ILIKE", true);
-      addFilter("directors", req.directors, "ILIKE", true);
-      addFilter("stars", req.stars, "ILIKE", true);
-      addFilter("rating", req.min_rating, ">=");
-      addFilter("rating", req.max_rating, "<=");
-      addFilter("runtime", req.min_runtime, ">=");
-      addFilter("runtime", req.max_runtime, "<=");
 
-      params.push(req.limit);
-      const sql = `SELECT ${SIMILARITY_SELECT}
-        FROM movies
-        WHERE ${where.join(" AND ")}
-        ORDER BY plot_embedding <=> CAST($1 AS vector)
-        LIMIT $${params.length}`;
+      const strict = await run(true);
+      const anyCategorical = Boolean(req.genre || req.directors || req.stars);
+      const relaxed =
+        anyCategorical && strict.movies.length === 0 ? await run(false) : undefined;
+      const movies = relaxed ? relaxed.movies : strict.movies;
+      const usedFilters = relaxed ? relaxed.usedFilters : strict.usedFilters;
 
-      const { rows } = await db.query(sql, params);
-      const movies = rows.map(toSemanticResult);
-      const { exact_matches, message } = categorize(movies, true);
-      logger.info({ len: movies.length, exact_matches, query: req.query.slice(0, 50) }, "Hybrid search executed");
+      const { exact_matches, message } = categorize(movies, usedFilters);
+      logger.info(
+        { len: movies.length, exact_matches, relaxed: Boolean(req.genre || req.directors || req.stars) && strict.movies.length === 0 && movies.length > 0, query: req.query.slice(0, 50) },
+        "Hybrid search executed",
+      );
       return { movies, exact_matches, message };
     } catch (err) {
       logger.error({ err }, "Hybrid search failed");
