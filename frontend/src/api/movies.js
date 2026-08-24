@@ -2,7 +2,7 @@
  * API client for FlickFindr backend
  */
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8001';
 
 /**
  * Fetch all genres with movie counts
