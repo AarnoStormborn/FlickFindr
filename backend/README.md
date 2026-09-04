@@ -58,6 +58,7 @@ No `.env` is required at boot — config ships dev defaults matching
 | `npm run build` / `start` | compile + run dist |
 | `npm test` / `typecheck` | vitest suite / tsc --noEmit |
 | `npm run init:db` | pgvector extension + movies table (idempotent) |
+| `npm run fetch:movies` | TMDB 1980→now (vote_count≥50), resume-safe upsert |
 | `npm run ingest -- <csv>` | load movies CSV (quote-aware) |
 | `npm run embeddings` | batch plot embeddings → plot_embedding |
 | `npm run check` | env/catalog/agent health report |

@@ -17,6 +17,7 @@ async function main(): Promise<void> {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS movies (
         id SERIAL PRIMARY KEY,
+        tmdb_id INTEGER UNIQUE,
         movie_name VARCHAR(255) NOT NULL,
         rating FLOAT,
         runtime INTEGER,
@@ -31,6 +32,9 @@ async function main(): Promise<void> {
         plot_embedding vector(384)
       )
     `);
+    // Migration for pre-existing databases (idempotent).
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS tmdb_id INTEGER");
+    await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_movies_tmdb_id ON movies (tmdb_id) WHERE tmdb_id IS NOT NULL");
     await pool.query("CREATE INDEX IF NOT EXISTS idx_movies_name ON movies (movie_name)");
     logger.info("Database schema ready (pgvector extension + movies table)");
   } catch (err) {
