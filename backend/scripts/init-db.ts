@@ -34,7 +34,10 @@ async function main(): Promise<void> {
     `);
     // Migration for pre-existing databases (idempotent).
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS tmdb_id INTEGER");
-    await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_movies_tmdb_id ON movies (tmdb_id) WHERE tmdb_id IS NOT NULL");
+    // Plain unique index (NULLs allowed — they are distinct), so
+    // ON CONFLICT (tmdb_id) resolves. Replaces any older partial index.
+    await pool.query("DROP INDEX IF EXISTS idx_movies_tmdb_id");
+    await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_movies_tmdb_id ON movies (tmdb_id)");
     await pool.query("CREATE INDEX IF NOT EXISTS idx_movies_name ON movies (movie_name)");
     logger.info("Database schema ready (pgvector extension + movies table)");
   } catch (err) {

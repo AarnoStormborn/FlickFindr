@@ -19,6 +19,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import "dotenv/config";
 import { getPool, closePool } from "../src/db/pool.js";
 import { logger } from "../src/logger.js";
 
@@ -34,6 +35,7 @@ const START_YEAR = Number(process.env.START_YEAR ?? 1980);
 const END_YEAR = Number(process.env.END_YEAR ?? new Date().getFullYear());
 const MIN_VOTE_COUNT = Number(process.env.MIN_VOTE_COUNT ?? 50);
 const PAGE_CAP = Number(process.env.TMDB_PAGE_CAP ?? 0); // 0 = unlimited
+const RESULT_CAP = Number(process.env.TMDB_RESULT_CAP ?? 0); // slice per page (smoke tests)
 const CONCURRENCY = Number(process.env.TMDB_CONCURRENCY ?? 6);
 const PROGRESS_FILE = path.resolve(process.cwd(), ".data", "tmdb-progress.json");
 
@@ -41,6 +43,9 @@ const BASE = "https://api.themoviedb.org/3";
 const LANGUAGE = "en-US";
 // TMDB hard cap: 500 pages / 10k results per query.
 const MAX_PAGES = 500;
+// With a result cap set (smoke tests), only fetch one discovery page.
+const EFFECTIVE_PAGE_CAP = PAGE_CAP > 0 ? PAGE_CAP : RESULT_CAP > 0 ? 1 : 0;
+const capResults = <T,>(arr: T[]): T[] => (RESULT_CAP > 0 ? arr.slice(0, RESULT_CAP) : arr);
 
 if (!API_KEY) {
   logger.error("TMDB_API_KEY is required (add to .env or export it)");
@@ -81,6 +86,8 @@ interface CreditsResponse {
 let genreNames = new Map<number, string>();
 let poolReady: Promise<void> | undefined;
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function tmdbJson<T>(urlPath: string, params: Record<string, string | number>): Promise<T> {
   const url = new URL(`${BASE}${urlPath}`);
   url.searchParams.set("api_key", API_KEY);
@@ -88,13 +95,24 @@ async function tmdbJson<T>(urlPath: string, params: Record<string, string | numb
 
   let attempt = 0;
   for (;;) {
-    const res = await fetch(url);
+    let res: Response;
+    try {
+      res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    } catch (err) {
+      // Network-level failures (ECONNRESET, timeouts) are transient too.
+      attempt += 1;
+      if (attempt > 8) throw new Error(`TMDB network failure after retries: ${err instanceof Error ? err.message : String(err)}`);
+      const delay = Math.min(1000 * 2 ** attempt, 30_000);
+      logger.warn({ attempt, delayMs: delay, err: err instanceof Error ? err.message : String(err) }, "TMDB network error; backing off");
+      await sleep(delay);
+      continue;
+    }
     if (res.ok) return (await res.json()) as T;
     if (res.status === 429 || res.status >= 500) {
       attempt += 1;
       const delay = Math.min(1000 * 2 ** attempt, 30_000);
       logger.warn({ status: res.status, attempt, delayMs: delay }, "TMDB rate-limit/error; backing off");
-      await new Promise((r) => setTimeout(r, delay));
+      await sleep(delay);
       if (attempt > 8) throw new Error(`TMDB request failed after retries: ${res.status}`);
       continue;
     }
@@ -219,7 +237,9 @@ async function fetchRange(gte: string, lte: string, progress: { completedYears: 
     page: 1,
   });
 
-  if (first.total_pages >= MAX_PAGES || (PAGE_CAP > 0 && first.total_pages > PAGE_CAP)) {
+  // Splitting exists only when we page through a full result set.
+  const needsSplit = EFFECTIVE_PAGE_CAP === 0 && first.total_pages >= MAX_PAGES;
+  if (needsSplit) {
     // Too many results: split the range in half and recurse.
     const mid = new Date((new Date(gte).getTime() + new Date(lte).getTime()) / 2)
       .toISOString()
@@ -231,7 +251,7 @@ async function fetchRange(gte: string, lte: string, progress: { completedYears: 
     return { kept: left.kept + right.kept, skipped: left.skipped + right.skipped };
   }
 
-  const totalPages = PAGE_CAP > 0 ? Math.min(PAGE_CAP, first.total_pages) : first.total_pages;
+  const totalPages = EFFECTIVE_PAGE_CAP > 0 ? Math.min(EFFECTIVE_PAGE_CAP, first.total_pages) : first.total_pages;
   let pageResult = first;
   if (page > 1) {
     pageResult = await tmdbJson<DiscoverResponse>("/discover/movie", {
@@ -246,7 +266,7 @@ async function fetchRange(gte: string, lte: string, progress: { completedYears: 
   }
 
   while (page <= totalPages) {
-    const movies = page === 1 ? pageResult.results : (
+    const movies = capResults(page === 1 ? pageResult.results : (
       await tmdbJson<DiscoverResponse>("/discover/movie", {
         "primary_release_date.gte": gte,
         "primary_release_date.lte": lte,
@@ -256,7 +276,7 @@ async function fetchRange(gte: string, lte: string, progress: { completedYears: 
         language: LANGUAGE,
         page,
       })
-    ).results;
+    ).results);
 
     // Upsert discover fields (skip movies without an overview).
     const keptIds: number[] = [];
@@ -288,7 +308,7 @@ async function fetchRange(gte: string, lte: string, progress: { completedYears: 
       logger.info({ gte, lte, page, totalPages, kept, skipped }, "range progress");
     }
     page += 1;
-    if (PAGE_CAP > 0 && page > PAGE_CAP) break;
+    if (EFFECTIVE_PAGE_CAP > 0 && page > EFFECTIVE_PAGE_CAP) break;
   }
 
   delete progress.pages[gte];
