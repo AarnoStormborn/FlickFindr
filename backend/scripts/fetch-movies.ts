@@ -22,7 +22,14 @@ import path from "node:path";
 import { getPool, closePool } from "../src/db/pool.js";
 import { logger } from "../src/logger.js";
 
-const API_KEY = process.env.TMDB_API_KEY;
+const API_KEY: string = (() => {
+  const key = process.env.TMDB_API_KEY;
+  if (!key) {
+    logger.error("TMDB_API_KEY is required (add to .env or export it)");
+    process.exit(1);
+  }
+  return key;
+})();
 const START_YEAR = Number(process.env.START_YEAR ?? 1980);
 const END_YEAR = Number(process.env.END_YEAR ?? new Date().getFullYear());
 const MIN_VOTE_COUNT = Number(process.env.MIN_VOTE_COUNT ?? 50);
