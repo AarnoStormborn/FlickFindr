@@ -50,7 +50,13 @@ def _midpoint_split(gte: str, lte: str) -> tuple[str, str] | None:
     return mid.isoformat(), (mid + timedelta(days=1)).isoformat()
 
 
-def _build_row(ctx: _Ctx, movie: dict[str, Any], page: int, credits: tuple[str | None, str | None], range_year: int) -> dict[str, Any] | None:
+def _build_row(
+    ctx: _Ctx,
+    movie: dict[str, Any],
+    page: int,
+    enrichment: tuple[str | None, str | None, int | None, int | None],
+    range_year: int,
+) -> dict[str, Any] | None:
     overview = (movie.get("overview") or "").strip()
     if not overview:
         return None  # no plot → no value; not recorded as pulled either
@@ -59,21 +65,20 @@ def _build_row(ctx: _Ctx, movie: dict[str, Any], page: int, credits: tuple[str |
         release_year = int(release)
     except ValueError:
         release_year = range_year
-    revenue = movie.get("revenue")
     votes = movie.get("vote_count")
-    directors, stars = credits
+    directors, stars, runtime, revenue = enrichment
     return {
         "tmdb_id": movie["id"],
         "movie_name": (movie.get("title") or f"Movie {movie['id']}")[:255],
         "release_year": release_year,
         "rating": movie.get("vote_average"),
-        "runtime": movie.get("runtime"),
+        "runtime": runtime,
         "genre": _genres_str(ctx, movie.get("genre_ids") or []),
         "plot": overview,
         "directors": directors,
         "stars": stars,
         "votes": votes if isinstance(votes, int) else (int(votes) if votes else None),
-        "gross": revenue if isinstance(revenue, int) and revenue > 0 else None,
+        "gross": revenue,
         "poster_url": f"https://image.tmdb.org/t/p/w500{movie['poster_path']}" if movie.get("poster_path") else None,
     }
 
@@ -149,8 +154,9 @@ def _fetch_range(ctx: _Ctx, gte: str, lte: str) -> None:
                 if not todo:
                     continue
 
-                # Credits enrichment, bounded concurrency, consumed in main thread.
-                futures = {pool.submit(ctx.tmdb.credits, m["id"]): m for m in todo}
+                # Enrichment (detail + credits in one call), bounded concurrency,
+                # consumed in main thread.
+                futures = {pool.submit(ctx.tmdb.credits_and_detail, m["id"]): m for m in todo}
                 for future in as_completed(futures):
                     movie = futures[future]
                     _consume(ctx, writer, gte, page, movie, future.result())
@@ -168,8 +174,8 @@ def _fetch_range(ctx: _Ctx, gte: str, lte: str) -> None:
         log.warning("range %s..%s left in_progress (limit reached) — will resume later", gte, lte)
 
 
-def _consume(ctx: _Ctx, writer: BatchWriter, gte: str, page: int, movie: dict[str, Any], credits: tuple[str | None, str | None]) -> None:
-    row = _build_row(ctx, movie, page, credits, int(gte[:4]))
+def _consume(ctx: _Ctx, writer: BatchWriter, gte: str, page: int, movie: dict[str, Any], enrichment: tuple[str | None, str | None, int | None, int | None]) -> None:
+    row = _build_row(ctx, movie, page, enrichment, int(gte[:4]))
     if row is None:
         return
     writer.add(row)

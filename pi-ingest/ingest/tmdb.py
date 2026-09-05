@@ -90,3 +90,41 @@ class TmdbClient:
         )
         stars = ", ".join(c.get("name", "").strip() for c in cast[:10])[:500] or None
         return directors, stars
+
+    def detail(self, movie_id: int) -> dict:
+        """Full /movie/{id} detail (runtime, revenue). Returns {} on failure so
+        rows still land with null runtime rather than being dropped."""
+        try:
+            data = self._get_json(f"/movie/{movie_id}", {})
+        except TmdbError as exc:
+            log.warning("detail failed for %s: %s", movie_id, exc)
+            return {}
+        return data
+
+    def credits_and_detail(self, movie_id: int) -> tuple[str | None, str | None, int | None, int | None]:
+        """(directors, stars, runtime_minutes, revenue) — one round trip per
+        movie keeps the enrichment calls batched and bounded."""
+        try:
+            data = self._get_json(f"/movie/{movie_id}", {"append_to_response": "credits"})
+        except TmdbError as exc:
+            log.warning("enrich failed for %s: %s", movie_id, exc)
+            return None, None, None, None
+        crew = data.get("credits", {}).get("crew", [])
+        directors = ", ".join(
+            c.get("name", "").strip()
+            for c in crew
+            if c.get("job") == "Director" and c.get("name")
+        )[:300] or None
+        cast = sorted(
+            (c for c in data.get("credits", {}).get("cast", []) if c.get("name")),
+            key=lambda c: c.get("order", 10**9),
+        )
+        stars = ", ".join(c.get("name", "").strip() for c in cast[:10])[:500] or None
+        runtime = data.get("runtime")
+        revenue = data.get("revenue")
+        return (
+            directors,
+            stars,
+            int(runtime) if isinstance(runtime, int) and runtime > 0 else None,
+            int(revenue) if isinstance(revenue, int) and revenue > 0 else None,
+        )
