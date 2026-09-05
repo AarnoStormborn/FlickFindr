@@ -162,7 +162,10 @@ def _fetch_range(ctx: _Ctx, gte: str, lte: str) -> None:
                     break
     finally:
         seq = _flush_and_upload(ctx, writer, gte, seq)
-    ctx.store.range_done(gte)
+    if not ctx.stopped:
+        ctx.store.range_done(gte)
+    else:
+        log.warning("range %s..%s left in_progress (limit reached) — will resume later", gte, lte)
 
 
 def _consume(ctx: _Ctx, writer: BatchWriter, gte: str, page: int, movie: dict[str, Any], credits: tuple[str | None, str | None]) -> None:
