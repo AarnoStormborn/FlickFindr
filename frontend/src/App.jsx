@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import MoviesPage from './pages/MoviesPage';
 import MovieDetailsPage from './pages/MovieDetailsPage';
 import GenrePage from './pages/GenrePage';
+import EraPage from './pages/EraPage';
 import SearchPage from './pages/SearchPage';
 import './App.css';
 
@@ -16,6 +17,7 @@ function App() {
           <Route path="/movies" element={<MoviesPage />} />
           <Route path="/movie/:id" element={<MovieDetailsPage />} />
           <Route path="/genre/:name" element={<GenrePage />} />
+          <Route path="/era/:id" element={<EraPage />} />
           <Route path="/search" element={<SearchPage />} />
         </Routes>
       </div>

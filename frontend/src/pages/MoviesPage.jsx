@@ -4,46 +4,27 @@ import CategoryRow from '../components/CategoryRow';
 import ViewToggle from '../components/ViewToggle';
 import MovieListTable from '../components/MovieListTable';
 import { getMoviesByGenre, searchMovies } from '../api/movies';
+import { YEAR_SHELVES, GENRE_ROWS, BEST_OF_MIN_VOTES, LATEST_MIN_VOTES } from '../data/shelves';
 import useViewMode from '../hooks/useViewMode';
 import './MoviesPage.css';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-/** Shelves use a vote floor so a handful of votes can't game the rating sort. */
-const BEST_OF_MIN_VOTES = 1000;
-const LATEST_MIN_VOTES = 300;
-
-/** Curated year-based shelves shown first. */
-const YEAR_SHELVES = [
-    {
-        id: 'latest',
-        displayName: 'Latest Releases',
-        caption: 'Fresh from the last two years',
-        load: () => searchMovies({ minYear: CURRENT_YEAR - 2, maxYear: CURRENT_YEAR, limit: 15, minVotes: LATEST_MIN_VOTES, sortBy: 'release_year', sortOrder: 'desc' }),
+/** Home rows: 15-result queries (full browse lives on the /era pages). */
+const HOME_SHELVES = YEAR_SHELVES.map((s) => ({
+    ...s,
+    load: () => {
+        if (s.id === 'latest') {
+            return searchMovies({ minYear: CURRENT_YEAR - 2, maxYear: CURRENT_YEAR, limit: 15, minVotes: LATEST_MIN_VOTES, sortBy: 'release_year', sortOrder: 'desc' });
+        }
+        if (s.id === 'retro') {
+            return searchMovies({ minYear: 1980, maxYear: 1989, limit: 15, minVotes: BEST_OF_MIN_VOTES, sortBy: 'rating', sortOrder: 'desc' });
+        }
+        return searchMovies({ minYear: 2000, maxYear: 2009, limit: 15, minVotes: BEST_OF_MIN_VOTES, sortBy: 'rating', sortOrder: 'desc' });
     },
-    {
-        id: 'retro',
-        displayName: 'Going Retro',
-        caption: 'Totally rad picks from the 80s',
-        load: () => searchMovies({ minYear: 1980, maxYear: 1989, limit: 15, minVotes: BEST_OF_MIN_VOTES, sortBy: 'rating', sortOrder: 'desc' }),
-    },
-    {
-        id: 'millennium',
-        displayName: 'The Millennium Classics',
-        caption: 'The best of 2000–2009',
-        load: () => searchMovies({ minYear: 2000, maxYear: 2009, limit: 15, minVotes: BEST_OF_MIN_VOTES, sortBy: 'rating', sortOrder: 'desc' }),
-    },
-];
+}));
 
-/** Curated genre rows shown after the year shelves. */
-const GENRE_ROWS = [
-    { id: 'drama', displayName: 'Top Drama', genres: ['Drama'], seeMoreGenre: 'Drama' },
-    { id: 'action', displayName: 'Action & Adventure', genres: ['Action', 'Adventure'], seeMoreGenre: 'Action' },
-    { id: 'comedy', displayName: 'Comedy', genres: ['Comedy'], seeMoreGenre: 'Comedy' },
-    { id: 'scifi', displayName: 'Sci-Fi & Fantasy', genres: ['Science Fiction', 'Fantasy'], seeMoreGenre: 'Science Fiction' },
-];
-
-const ALL_ROWS = [...YEAR_SHELVES, ...GENRE_ROWS];
+const ALL_ROWS = [...HOME_SHELVES, ...GENRE_ROWS];
 
 /** Merge multiple result sets, dedupe by id, keep top N by rating desc. */
 function mergeTop(perFetch, top = 15) {
@@ -111,8 +92,9 @@ export default function MoviesPage() {
         fetchAll();
     }, []);
 
-    const handleSeeMore = (genre) => {
-        navigate(`/genre/${genre}`);
+    const handleSeeMore = (row, isGenre) => {
+        if (isGenre) navigate(`/genre/${row.seeMoreGenre}`);
+        else navigate(`/era/${row.id}`);
     };
 
     // Load a broad, top-rated set the first time list view is opened.
@@ -146,7 +128,7 @@ export default function MoviesPage() {
             caption={row.caption}
             movies={rowData[row.id] || []}
             isLoading={loading[row.id]}
-            onSeeMore={isGenre ? () => handleSeeMore(row.seeMoreGenre) : undefined}
+            onSeeMore={() => handleSeeMore(row, isGenre)}
         />
     );
 
@@ -172,7 +154,7 @@ export default function MoviesPage() {
             {/* Shelves */}
             {view === 'grid' ? (
                 <div className="movies-categories">
-                    {YEAR_SHELVES.map((row) => renderShelf(row, false))}
+                    {HOME_SHELVES.map((row) => renderShelf(row, false))}
                     <div className="genre-row-divider" />
                     {GENRE_ROWS.map((row) => renderShelf(row, true))}
                 </div>
