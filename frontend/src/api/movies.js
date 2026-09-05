@@ -30,20 +30,26 @@ export async function getStats() {
  * Structural search with filters
  */
 export async function searchMovies(params = {}) {
+    const body = {};
+    if (params.query) body.query = params.query;
+    if (params.genre) body.genre = params.genre;
+    if (params.directors) body.directors = params.directors;
+    if (params.stars) body.stars = params.stars;
+    if (params.minRating != null) body.min_rating = params.minRating;
+    if (params.maxRating != null) body.max_rating = params.maxRating;
+    if (params.minRuntime != null) body.min_runtime = params.minRuntime;
+    if (params.maxRuntime != null) body.max_runtime = params.maxRuntime;
+    body.sort_by = params.sortBy || 'rating';
+    body.sort_order = params.sortOrder || 'desc';
+    body.skip = params.skip || 0;
+    body.limit = params.limit || 15;
+
     const response = await fetch(`${API_BASE_URL}/search/structural`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            genre: params.genre || null,
-            min_rating: params.minRating || null,
-            max_rating: params.maxRating || null,
-            sort_by: params.sortBy || 'rating',
-            sort_order: params.sortOrder || 'desc',
-            skip: params.skip || 0,
-            limit: params.limit || 15,
-        }),
+        body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -97,18 +103,23 @@ export async function semanticSearch(query, limit = 10) {
  * Hybrid search combining filters and semantic search
  */
 export async function hybridSearch(params) {
+    const body = {};
+    body.query = params.query;
+    if (params.genre) body.genre = params.genre;
+    if (params.directors) body.directors = params.directors;
+    if (params.stars) body.stars = params.stars;
+    if (params.minRating != null) body.min_rating = params.minRating;
+    if (params.maxRating != null) body.max_rating = params.maxRating;
+    if (params.minRuntime != null) body.min_runtime = params.minRuntime;
+    if (params.maxRuntime != null) body.max_runtime = params.maxRuntime;
+    body.limit = params.limit || 10;
+
     const response = await fetch(`${API_BASE_URL}/search/hybrid`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            query: params.query,
-            genre: params.genre || null,
-            min_rating: params.minRating || null,
-            max_rating: params.maxRating || null,
-            limit: params.limit || 10,
-        }),
+        body: JSON.stringify(body),
     });
 
     if (!response.ok) {
