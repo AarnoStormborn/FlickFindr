@@ -41,7 +41,7 @@ export function buildApp(deps: AppDeps) {
 export async function startServer(deps: AppDeps): Promise<ReturnType<typeof buildApp>> {
   const app = buildApp(deps);
   try {
-    await app.listen({ port: config.port, host: "0.0.0.0" });
+    await app.listen({ port: config.port, host: "::" });
     logger.info({ port: config.port }, "FlickFindr API listening");
   } catch (err) {
     logger.error({ err }, "Failed to start server");
