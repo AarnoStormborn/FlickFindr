@@ -1,32 +1,34 @@
+import { NavLink } from 'react-router-dom';
 import './Navbar.css';
 
 export default function Navbar() {
+    const activeClass = ({ isActive }) => (isActive ? 'navbar-link active' : 'navbar-link');
     return (
         <nav className="navbar">
             <div className="navbar-container">
                 {/* Logo */}
-                <a href="/" className="navbar-logo">
+                <NavLink to="/" className="navbar-logo">
                     <span className="logo-icon">🎬</span>
                     <span className="logo-text">FlickFindr</span>
-                </a>
+                </NavLink>
 
                 {/* Navigation Links */}
                 <ul className="navbar-menu">
                     <li className="navbar-item">
-                        <a href="/" className="navbar-link active">
+                        <NavLink to="/" end className={activeClass}>
                             Home
-                        </a>
+                        </NavLink>
                     </li>
                     <li className="navbar-item">
-                        <a href="/search" className="navbar-link">
+                        <NavLink to="/search" className={activeClass}>
                             Search
-                        </a>
+                        </NavLink>
                     </li>
                 </ul>
 
                 {/* Right Side - Search & Profile */}
                 <div className="navbar-actions">
-                    <a href="/search" className="navbar-search-btn" aria-label="Search">
+                    <NavLink to="/search" className="navbar-search-btn" aria-label="Search">
                         <svg
                             width="20"
                             height="20"
@@ -38,7 +40,7 @@ export default function Navbar() {
                             <circle cx="11" cy="11" r="8" />
                             <path d="m21 21-4.35-4.35" />
                         </svg>
-                    </a>
+                    </NavLink>
                     <div className="navbar-profile">
                         <span className="profile-avatar">👤</span>
                     </div>

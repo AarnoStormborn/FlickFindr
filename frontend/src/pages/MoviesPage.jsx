@@ -7,16 +7,18 @@ import { getMoviesByGenre, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
 import './MoviesPage.css';
 
-// Categories to display - curated list for best experience
+// Categories to display - curated list for best experience.
+// `genres` are the real DB genre names (TMDB naming); `seeMoreGenre` is the
+// genre used for the "See more" link.
 const FEATURED_GENRES = [
-    { name: 'Drama', displayName: 'Top Drama' },
-    { name: 'Action', displayName: 'Action & Adventure' },
-    { name: 'Comedy', displayName: 'Comedy' },
-    { name: 'Crime', displayName: 'Crime & Thriller' },
-    { name: 'Romance', displayName: 'Romance' },
-    { name: 'Sci-Fi', displayName: 'Sci-Fi & Fantasy' },
-    { name: 'Horror', displayName: 'Horror' },
-    { name: 'Animation', displayName: 'Animation & Family' },
+    { id: 'drama', displayName: 'Top Drama', genres: ['Drama'], seeMoreGenre: 'Drama' },
+    { id: 'action', displayName: 'Action & Adventure', genres: ['Action', 'Adventure'], seeMoreGenre: 'Action' },
+    { id: 'comedy', displayName: 'Comedy', genres: ['Comedy'], seeMoreGenre: 'Comedy' },
+    { id: 'crime', displayName: 'Crime & Thriller', genres: ['Crime', 'Thriller'], seeMoreGenre: 'Crime' },
+    { id: 'romance', displayName: 'Romance', genres: ['Romance'], seeMoreGenre: 'Romance' },
+    { id: 'scifi', displayName: 'Sci-Fi & Fantasy', genres: ['Science Fiction', 'Fantasy'], seeMoreGenre: 'Science Fiction' },
+    { id: 'horror', displayName: 'Horror', genres: ['Horror'], seeMoreGenre: 'Horror' },
+    { id: 'animation', displayName: 'Animation & Family', genres: ['Animation', 'Family'], seeMoreGenre: 'Animation' },
 ];
 
 export default function MoviesPage() {
@@ -28,36 +30,45 @@ export default function MoviesPage() {
     const [topMovies, setTopMovies] = useState([]);
     const [topLoading, setTopLoading] = useState(false);
 
-    // Fetch movies for each genre on mount
+    // Fetch movies for each featured category on mount.
     useEffect(() => {
         const fetchAllCategories = async () => {
-            // Initialize loading states
             const loadingState = {};
-            FEATURED_GENRES.forEach(g => loadingState[g.name] = true);
+            FEATURED_GENRES.forEach((g) => (loadingState[g.id] = true));
             setLoading(loadingState);
 
-            // Fetch each genre in parallel
-            const fetchPromises = FEATURED_GENRES.map(async (genre) => {
+            // Each category may span multiple genres — fetch in parallel,
+            // merge with dedupe, sort by rating desc.
+            const fetchPromises = FEATURED_GENRES.map(async (cat) => {
                 try {
-                    const response = await getMoviesByGenre(genre.name, 15);
-                    return { genre: genre.name, data: response.results };
+                    const perGenre = await Promise.all(
+                        cat.genres.map((g) => getMoviesByGenre(g, 15)),
+                    );
+                    const seen = new Set();
+                    const merged = [];
+                    perGenre
+                        .flatMap((res) => res.results ?? [])
+                        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+                        .forEach((m) => {
+                            if (seen.has(m.id)) return;
+                            seen.add(m.id);
+                            merged.push(m);
+                        });
+                    return { id: cat.id, data: merged.slice(0, 15) };
                 } catch (err) {
-                    console.error(`Failed to fetch ${genre.name}:`, err);
-                    return { genre: genre.name, data: [] };
+                    console.error(`Failed to fetch ${cat.displayName}:`, err);
+                    return { id: cat.id, data: [] };
                 }
             });
 
             try {
                 const results = await Promise.all(fetchPromises);
-
                 const newCategoryData = {};
                 const newLoading = {};
-
-                results.forEach(({ genre, data }) => {
-                    newCategoryData[genre] = data;
-                    newLoading[genre] = false;
+                results.forEach(({ id, data }) => {
+                    newCategoryData[id] = data;
+                    newLoading[id] = false;
                 });
-
                 setCategoryData(newCategoryData);
                 setLoading(newLoading);
             } catch (err) {
@@ -69,8 +80,8 @@ export default function MoviesPage() {
         fetchAllCategories();
     }, []);
 
-    const handleSeeMore = (genre) => {
-        navigate(`/genre/${genre}`);
+    const handleSeeMore = (category) => {
+        navigate(`/genre/${category.seeMoreGenre}`);
     };
 
     // Load a broad, top-rated set the first time list view is opened.
@@ -119,13 +130,13 @@ export default function MoviesPage() {
             {/* Category Rows */}
             {view === 'grid' ? (
                 <div className="movies-categories">
-                    {FEATURED_GENRES.map((genre) => (
+                    {FEATURED_GENRES.map((cat) => (
                         <CategoryRow
-                            key={genre.name}
-                            title={genre.displayName}
-                            movies={categoryData[genre.name] || []}
-                            isLoading={loading[genre.name]}
-                            onSeeMore={() => handleSeeMore(genre.name)}
+                            key={cat.id}
+                            title={cat.displayName}
+                            movies={categoryData[cat.id] || []}
+                            isLoading={loading[cat.id]}
+                            onSeeMore={() => handleSeeMore(cat)}
                         />
                     ))}
                 </div>
