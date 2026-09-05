@@ -78,10 +78,18 @@ export function buildStructuralQuery(req: StructuralSearchRequest): StructuralQu
     whereParams.push(req.max_runtime);
     where.push(`runtime <= $${whereParams.length}`);
   }
+  if (req.min_year !== undefined) {
+    whereParams.push(req.min_year);
+    where.push(`release_year >= $${whereParams.length}`);
+  }
+  if (req.max_year !== undefined) {
+    whereParams.push(req.max_year);
+    where.push(`release_year <= $${whereParams.length}`);
+  }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const order = req.sort_order === "desc" ? "DESC" : "ASC";
-  const sortColumn = ["movie_name", "rating", "runtime", "metascore"].includes(req.sort_by)
+  const sortColumn = ["movie_name", "rating", "runtime", "metascore", "release_year"].includes(req.sort_by)
     ? req.sort_by
     : "rating";
 

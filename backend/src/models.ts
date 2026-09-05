@@ -5,7 +5,7 @@ import { z } from "zod";
  * Validation mirrors the old pydantic models (ranges, optional filters).
  */
 
-export const SortableFields = ["rating", "runtime", "movie_name", "metascore"] as const;
+export const SortableFields = ["rating", "runtime", "movie_name", "metascore", "release_year"] as const;
 export type SortByField = (typeof SortableFields)[number];
 
 export const SortOrderSchema = z.enum(["asc", "desc"]).default("desc");
@@ -20,6 +20,8 @@ export const StructuralSearchRequestSchema = z.object({
   max_rating: z.number().min(0).max(10).optional(),
   min_runtime: z.number().int().min(0).optional(),
   max_runtime: z.number().int().min(0).optional(),
+  min_year: z.number().int().min(1880).max(2100).optional(),
+  max_year: z.number().int().min(1880).max(2100).optional(),
   sort_by: SortBySchema,
   sort_order: SortOrderSchema,
   skip: z.number().int().min(0).default(0),

@@ -1,0 +1,84 @@
+/* ========================================
+   Metadata (structured) Filter Form
+   ======================================== */
+
+.metadata-form {
+    max-width: 760px;
+    margin: 0 auto var(--space-xl);
+    padding: var(--space-lg);
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--card-radius-lg);
+    text-align: left;
+}
+
+.metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+}
+
+.metadata-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.metadata-field span {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.metadata-field input,
+.metadata-field select {
+    width: 100%;
+    padding: var(--space-sm) var(--space-sm);
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.metadata-field input:focus,
+.metadata-field select:focus {
+    border-color: var(--accent-blue);
+}
+
+.metadata-field input::placeholder {
+    color: var(--text-muted);
+}
+
+.metadata-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-lg);
+}
+
+.metadata-submit {
+    padding: var(--space-sm) var(--space-xl);
+    background: var(--accent-gradient);
+    border: none;
+    border-radius: 999px;
+    color: #fff;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.metadata-submit:hover {
+    transform: scale(1.03);
+    opacity: 0.92;
+}
+
+@media (max-width: 700px) {
+    .metadata-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
