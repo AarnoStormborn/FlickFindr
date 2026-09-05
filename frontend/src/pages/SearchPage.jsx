@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MovieCard from '../components/MovieCard';
+import MovieListTable from '../components/MovieListTable';
+import ViewToggle from '../components/ViewToggle';
 import { hybridSearch, semanticSearch, searchMovies } from '../api/movies';
+import useViewMode from '../hooks/useViewMode';
 import './SearchPage.css';
 
 const MODES = [
@@ -24,6 +27,7 @@ export default function SearchPage() {
     const [results, setResults] = useState([]);
     const [meta, setMeta] = useState(null); // { message, exact_matches, total }
     const [searched, setSearched] = useState('');
+    const [view, setView] = useViewMode();
 
     const runSearch = useCallback(
         async (query, searchMode) => {
@@ -147,15 +151,20 @@ export default function SearchPage() {
                         <h2 className="search-results-title">
                             Results for “{searched}”
                         </h2>
-                        {meta.message && (
-                            <p className={`search-message ${meta.exact_matches === true ? 'exact' : meta.exact_matches === false ? 'similar' : ''}`}>
-                                {meta.message}
-                                {typeof meta.total === 'number' && mode === 'structural' && ` · ${meta.total} matches`}
-                            </p>
-                        )}
-                        {mode !== 'structural' && !meta.message && (
-                            <p className="search-message">{results.length} movies</p>
-                        )}
+                        <div className="search-meta-row">
+                            <div className="search-meta-text">
+                                {meta.message && (
+                                    <p className={`search-message ${meta.exact_matches === true ? 'exact' : meta.exact_matches === false ? 'similar' : ''}`}>
+                                        {meta.message}
+                                        {typeof meta.total === 'number' && mode === 'structural' && ` · ${meta.total} matches`}
+                                    </p>
+                                )}
+                                {mode !== 'structural' && !meta.message && (
+                                    <p className="search-message">{results.length} movies</p>
+                                )}
+                            </div>
+                            <ViewToggle view={view} onChange={setView} />
+                        </div>
                     </div>
                 )}
 
@@ -165,13 +174,15 @@ export default function SearchPage() {
                     </div>
                 )}
 
-                {!loading && !error && results.length > 0 && (
+                {!loading && !error && results.length > 0 && (view === 'grid' ? (
                     <div className="search-grid">
                         {results.map((movie) => (
                             <MovieCard key={movie.id} movie={movie} />
                         ))}
                     </div>
-                )}
+                ) : (
+                    <MovieListTable movies={results} emptyText="No movies matched that search." />
+                ))}
 
                 {!loading && !error && !searched && (
                     <div className="search-empty">

@@ -1,0 +1,36 @@
+/* ========================================
+   View Toggle (grid / list)
+   ======================================== */
+
+.view-toggle {
+    display: inline-flex;
+    gap: var(--space-xs);
+    padding: 3px;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.view-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.view-toggle-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.view-toggle-btn.active {
+    background: var(--accent-gold);
+    color: #000;
+}

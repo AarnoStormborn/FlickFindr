@@ -136,6 +136,19 @@
     margin-bottom: var(--space-xs);
 }
 
+.search-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+.search-meta-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .search-message {
     color: var(--text-secondary);
     font-size: var(--font-size-sm);

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CategoryRow from '../components/CategoryRow';
-import { getMoviesByGenre } from '../api/movies';
+import ViewToggle from '../components/ViewToggle';
+import MovieListTable from '../components/MovieListTable';
+import { getMoviesByGenre, searchMovies } from '../api/movies';
+import useViewMode from '../hooks/useViewMode';
 import './MoviesPage.css';
 
 // Categories to display - curated list for best experience
@@ -21,6 +24,9 @@ export default function MoviesPage() {
     const [categoryData, setCategoryData] = useState({});
     const [loading, setLoading] = useState({});
     const [error, setError] = useState(null);
+    const [view, setView] = useViewMode();
+    const [topMovies, setTopMovies] = useState([]);
+    const [topLoading, setTopLoading] = useState(false);
 
     // Fetch movies for each genre on mount
     useEffect(() => {
@@ -67,6 +73,18 @@ export default function MoviesPage() {
         navigate(`/genre/${genre}`);
     };
 
+    // Load a broad, top-rated set the first time list view is opened.
+    const handleViewChange = (nextView) => {
+        setView(nextView);
+        if (nextView === 'list' && topMovies.length === 0 && !topLoading) {
+            setTopLoading(true);
+            searchMovies({ limit: 50, sortBy: 'rating', sortOrder: 'desc' })
+                .then((res) => setTopMovies(res.results ?? []))
+                .catch((err) => console.error('Failed to load top movies:', err))
+                .finally(() => setTopLoading(false));
+        }
+    };
+
     if (error) {
         return (
             <div className="movies-page">
@@ -89,24 +107,45 @@ export default function MoviesPage() {
                         <span className="hero-highlight"> Favorite Film</span>
                     </h1>
                     <p className="hero-subtitle">
-                        Explore our collection of nearly 10,000 movies across all genres
+                        Explore our collection of nearly 30,000 movies across all genres
                     </p>
+                    <div className="hero-view-toggle">
+                        <ViewToggle view={view} onChange={handleViewChange} />
+                    </div>
                 </div>
                 <div className="hero-gradient"></div>
             </section>
 
             {/* Category Rows */}
-            <div className="movies-categories">
-                {FEATURED_GENRES.map((genre) => (
-                    <CategoryRow
-                        key={genre.name}
-                        title={genre.displayName}
-                        movies={categoryData[genre.name] || []}
-                        isLoading={loading[genre.name]}
-                        onSeeMore={() => handleSeeMore(genre.name)}
-                    />
-                ))}
-            </div>
+            {view === 'grid' ? (
+                <div className="movies-categories">
+                    {FEATURED_GENRES.map((genre) => (
+                        <CategoryRow
+                            key={genre.name}
+                            title={genre.displayName}
+                            movies={categoryData[genre.name] || []}
+                            isLoading={loading[genre.name]}
+                            onSeeMore={() => handleSeeMore(genre.name)}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <div className="movies-categories">
+                    <section className="category-row fade-in">
+                        <div className="category-header">
+                            <h2 className="category-title">Top Rated</h2>
+                        </div>
+                        {topLoading ? (
+                            <div className="genre-loading">
+                                <div className="loading-spinner"></div>
+                                <p>Loading movies...</p>
+                            </div>
+                        ) : (
+                            <MovieListTable movies={topMovies} emptyText="No movies found" />
+                        )}
+                    </section>
+                </div>
+            )}
 
             {/* Footer spacing */}
             <div className="movies-footer-space"></div>

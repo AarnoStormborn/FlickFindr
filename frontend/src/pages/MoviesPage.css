@@ -76,6 +76,13 @@
     padding: 0 10%;
 }
 
+/* Hero View Toggle */
+.hero-view-toggle {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--space-lg);
+}
+
 /* Error State */
 .movies-error {
     display: flex;

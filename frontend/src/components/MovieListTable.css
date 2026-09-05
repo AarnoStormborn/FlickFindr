@@ -1,0 +1,110 @@
+/* ========================================
+   Movie List Table
+   ======================================== */
+
+.movie-list-empty {
+    padding: var(--space-2xl) 0;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.movie-list-table {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--card-radius-lg);
+    overflow: hidden;
+}
+
+/* Shared column grid: thumb | title | year | rating | runtime | genre | director */
+.movie-list-head,
+.movie-list-row {
+    display: grid;
+    grid-template-columns: 56px minmax(180px, 2.2fr) 64px 84px 92px minmax(110px, 1.2fr) minmax(140px, 1.6fr);
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-lg);
+}
+
+.movie-list-head {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.movie-list-row {
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    font-size: var(--font-size-sm);
+}
+
+.movie-list-row:hover {
+    background: var(--bg-hover);
+}
+
+.movie-list-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.movie-list-thumb {
+    display: block;
+    width: 40px;
+    height: 58px;
+    object-fit: cover;
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+}
+
+.movie-list-title {
+    color: var(--text-primary);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.movie-list-row:hover .movie-list-title {
+    color: var(--accent-gold);
+}
+
+.movie-list-genre {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--bg-tertiary);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.movie-list-directors {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col-year,
+.col-rating,
+.col-runtime {
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* Narrow screens: drop the less essential columns */
+@media (max-width: 900px) {
+    .movie-list-head,
+    .movie-list-row {
+        grid-template-columns: 56px minmax(150px, 1fr) 64px 84px;
+    }
+    .col-runtime,
+    .col-genre,
+    .col-director {
+        display: none;
+    }
+}
