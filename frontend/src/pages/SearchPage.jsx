@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MovieCard from '../components/MovieCard';
 import MovieListTable from '../components/MovieListTable';
@@ -8,6 +8,7 @@ import { hybridSearch, semanticSearch, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
 import './SearchPage.css';
 
+const TEXT_MODES = ['hybrid', 'semantic'];
 const MODES = [
     {
         id: 'hybrid',
@@ -29,6 +30,10 @@ const MODES = [
     },
 ];
 
+function isValidMode(m) {
+    return MODES.some((x) => x.id === m);
+}
+
 function modeTitle(id) {
     return MODES.find((m) => m.id === id)?.title ?? '';
 }
@@ -49,27 +54,51 @@ function filtersFromParams(searchParams) {
     };
 }
 
+/** Human-readable summary of structural filters. */
+function filtersLabel(f) {
+    return [
+        f.query && `title "${f.query}"`,
+        f.genre && `genre ${f.genre}`,
+        f.stars && `actor ${f.stars}`,
+        f.directors && `director ${f.directors}`,
+        f.minYear && `since ${f.minYear}`,
+        f.maxYear && `until ${f.maxYear}`,
+        f.minRating && `${f.minRating}+ rating`,
+    ]
+        .filter(Boolean)
+        .join(', ');
+}
+
+function hasAnyFilter(f) {
+    return ['query', 'genre', 'stars', 'directors', 'minYear', 'maxYear', 'minRating'].some(
+        (k) => f[k] !== undefined,
+    );
+}
+
 export default function SearchPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
 
+    // URL is the single source of truth for mode + query + filters.
+    const mode = isValidMode(searchParams.get('mode')) ? searchParams.get('mode') : 'hybrid';
     const queryFromUrl = searchParams.get('q') ?? '';
-    const modeFromUrl = searchParams.get('mode') ?? 'hybrid';
-    const isStructural = modeFromUrl === 'structural';
-    const urlFilters = isStructural ? filtersFromParams(searchParams) : null;
+    const urlFilters = mode === 'structural' ? filtersFromParams(searchParams) : null;
 
     const [input, setInput] = useState(queryFromUrl);
-    const [mode, setMode] = useState(MODES.some((m) => m.id === modeFromUrl) ? modeFromUrl : 'hybrid');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [results, setResults] = useState([]);
-    const [meta, setMeta] = useState(null); // { message, exact_matches, total }
+    const [meta, setMeta] = useState(null);
     const [searched, setSearched] = useState('');
-    const [structuralFilters, setStructuralFilters] = useState(urlFilters);
     const [view, setView] = useViewMode();
 
+    // Monotonic generation: responses from an older mode/search are ignored.
+    const generationRef = useRef(0);
+
     const runTextSearch = useCallback(async (query, searchMode) => {
+        const gen = ++generationRef.current;
         if (!query.trim()) {
+            setLoading(false);
             setResults([]);
             setMeta(null);
             setSearched('');
@@ -89,6 +118,7 @@ export default function SearchPage() {
                 data = await hybridSearch({ query: query.trim(), limit: 20 });
                 message = data.message;
             }
+            if (generationRef.current !== gen) return; // stale — a newer search started
             setResults(data.results ?? []);
             setMeta({
                 message,
@@ -97,16 +127,18 @@ export default function SearchPage() {
             });
             setSearched(query.trim());
         } catch (err) {
+            if (generationRef.current !== gen) return;
             console.error('Search failed:', err);
             setError(err.message || 'Search failed. Is the backend running?');
             setResults([]);
             setMeta(null);
         } finally {
-            setLoading(false);
+            if (generationRef.current === gen) setLoading(false);
         }
     }, []);
 
     const runStructuralSearch = useCallback(async (filters) => {
+        const gen = ++generationRef.current;
         setLoading(true);
         setError(null);
         try {
@@ -123,59 +155,55 @@ export default function SearchPage() {
             if (filters.maxYear) params.maxYear = filters.maxYear;
             if (filters.minRating) params.minRating = filters.minRating;
             const data = await searchMovies(params);
+            if (generationRef.current !== gen) return;
             setResults(data.results ?? []);
-            setMeta({
-                message: null,
-                exact_matches: null,
-                total: data.total ?? data.results?.length ?? 0,
-            });
-            const label = [
-                filters.query && `title "${filters.query}"`,
-                filters.genre && `genre ${filters.genre}`,
-                filters.stars && `actor ${filters.stars}`,
-                filters.directors && `director ${filters.directors}`,
-                filters.minYear && `since ${filters.minYear}`,
-                filters.maxYear && `until ${filters.maxYear}`,
-                filters.minRating && `${filters.minRating}+ rating`,
-            ].filter(Boolean).join(', ');
-            setSearched(label || 'all movies');
+            setMeta({ message: null, exact_matches: null, total: data.total ?? data.results?.length ?? 0 });
+            setSearched(filtersLabel(filters) || 'all movies');
         } catch (err) {
+            if (generationRef.current !== gen) return;
             console.error('Search failed:', err);
             setError(err.message || 'Search failed. Is the backend running?');
             setResults([]);
             setMeta(null);
         } finally {
-            setLoading(false);
+            if (generationRef.current === gen) setLoading(false);
         }
     }, []);
 
-    // Sync URL state into the page + trigger search on navigation / back.
+    const clearResults = useCallback(() => {
+        generationRef.current += 1; // invalidate any in-flight search
+        setLoading(false);
+        setError(null);
+        setResults([]);
+        setMeta(null);
+        setSearched('');
+    }, []);
+
+    // Drive searches purely from URL changes (navigation, back/forward, mode chip).
     useEffect(() => {
         setInput(queryFromUrl);
-        setMode(MODES.some((m) => m.id === modeFromUrl) ? modeFromUrl : 'hybrid');
-        if (modeFromUrl === 'structural') {
-            const filters = filtersFromParams(searchParams);
-            setStructuralFilters(filters);
-            const hasAny = Object.values(filters).some((v) => v !== undefined && v !== 'rating' && v !== 'desc');
-            if (hasAny) runStructuralSearch(filters);
-            else {
-                setResults([]);
-                setMeta(null);
-                setSearched('');
+        if (mode === 'structural') {
+            if (hasAnyFilter(urlFilters)) {
+                runStructuralSearch(urlFilters);
+            } else {
+                clearResults();
             }
-        } else if (queryFromUrl) {
-            runTextSearch(queryFromUrl, modeFromUrl);
+        } else if (queryFromUrl.trim()) {
+            runTextSearch(queryFromUrl, mode);
+        } else {
+            clearResults();
         }
-    }, [queryFromUrl, modeFromUrl, runTextSearch, runStructuralSearch, searchParams]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode, queryFromUrl, searchParams]);
 
     const submitText = (e) => {
         e?.preventDefault?.();
-        setSearchParams({ q: input.trim(), mode });
-        runTextSearch(input, mode);
+        const q = input.trim();
+        if (!q) return;
+        setSearchParams({ q, mode });
     };
 
     const submitStructural = (filters) => {
-        setStructuralFilters(filters);
         const sp = new URLSearchParams({ mode: 'structural' });
         if (filters.query) sp.set('title', filters.query);
         if (filters.genre) sp.set('genre', filters.genre);
@@ -187,26 +215,24 @@ export default function SearchPage() {
         if (filters.sortBy !== 'rating') sp.set('sort_by', filters.sortBy);
         if (filters.sortOrder !== 'desc') sp.set('sort_order', filters.sortOrder);
         setSearchParams(sp);
-        runStructuralSearch(filters);
     };
 
+    // Mode switch only rewrites the URL, preserving the query text so that
+    // toggling back to a text mode re-runs the SAME search. Structural-only
+    // filter params are stripped when leaving structural mode; structural
+    // mode itself ignores `q`. The URL effect does the rest.
     const switchMode = (id) => {
-        setMode(id);
-        setResults([]);
-        setMeta(null);
-        setSearched('');
-        setError(null);
-        if (id === 'structural') {
-            setSearchParams({ mode: id });
-        } else if (input.trim()) {
-            setSearchParams({ q: input.trim(), mode: id });
-            runTextSearch(input, id);
-        } else {
-            setSearchParams({ mode: id });
+        const sp = new URLSearchParams(searchParams);
+        sp.set('mode', id);
+        if (id !== 'structural') {
+            ['title', 'genre', 'actor', 'director', 'min_year', 'max_year', 'min_rating', 'sort_by', 'sort_order'].forEach((k) => sp.delete(k));
+            if (!sp.get('q') && input.trim()) sp.set('q', input.trim());
         }
+        setSearchParams(sp);
     };
 
-    const showSearchBar = mode === 'hybrid' || mode === 'semantic';
+    const showSearchBar = TEXT_MODES.includes(mode);
+    const activeStructuralFilters = mode === 'structural' ? urlFilters : null;
 
     return (
         <div className="search-page">
@@ -230,16 +256,12 @@ export default function SearchPage() {
                             placeholder="Try 'a dark superhero movie by Nolan'…"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            autoFocus
+                            autoFocus={showSearchBar}
                         />
                         <button type="submit" className="search-bar-button">Search</button>
                     </form>
                 ) : (
-                    <MetadataForm
-                        key={modeFromUrl + JSON.stringify(urlFilters || {})}
-                        initial={urlFilters}
-                        onSearch={submitStructural}
-                    />
+                    <MetadataForm key={JSON.stringify(activeStructuralFilters || {})} initial={urlFilters} onSearch={submitStructural} />
                 )}
 
                 <div className="search-modes">
@@ -268,7 +290,7 @@ export default function SearchPage() {
                 {!loading && error && (
                     <div className="search-error">
                         <p>{error}</p>
-                        <button className="search-retry" onClick={() => (mode === 'structural' ? runStructuralSearch(structuralFilters) : runTextSearch(input, mode))}>Try Again</button>
+                        <button className="search-retry" onClick={() => (mode === 'structural' ? submitStructural(urlFilters) : runTextSearch(input, mode))}>Try Again</button>
                     </div>
                 )}
 
@@ -309,12 +331,12 @@ export default function SearchPage() {
                     <MovieListTable movies={results} emptyText="No movies matched that search." />
                 ))}
 
-                {!loading && !error && !searched && mode !== 'structural' && (
+                {!loading && !error && !searched && showSearchBar && (
                     <div className="search-empty">
                         <p>Enter a query above — try comparing modes to see the difference.</p>
                     </div>
                 )}
-                {!loading && !error && !searched && mode === 'structural' && (
+                {!loading && !error && !searched && !showSearchBar && (
                     <div className="search-empty">
                         <p>Set some fields above, then press Search movies.</p>
                     </div>
