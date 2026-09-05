@@ -9,10 +9,29 @@ import useViewMode from '../hooks/useViewMode';
 import './SearchPage.css';
 
 const MODES = [
-    { id: 'hybrid', label: 'Hybrid', description: 'Agent-parsed · best for natural language' },
-    { id: 'semantic', label: 'Semantic', description: 'Match by plot description' },
-    { id: 'structural', label: 'Structural', description: 'Filter by metadata (genre, actor, year…)' },
+    {
+        id: 'hybrid',
+        label: 'Hybrid',
+        title: 'Natural language + filters',
+        description: 'Describe what you want; combine with filters. Best for everyday searches.',
+    },
+    {
+        id: 'semantic',
+        label: 'Describe the plot',
+        title: 'Search by what it’s about',
+        description: 'Type a story, mood, or scene — “a prison escape about friendship”.',
+    },
+    {
+        id: 'structural',
+        label: 'Filter by details',
+        title: 'Search with metadata',
+        description: 'Narrow by genre, actor, director, release year, rating — no sentence needed.',
+    },
 ];
+
+function modeTitle(id) {
+    return MODES.find((m) => m.id === id)?.title ?? '';
+}
 
 /** Read metadata filters out of URL search params (back-nav friendly). */
 function filtersFromParams(searchParams) {
@@ -193,15 +212,11 @@ export default function SearchPage() {
         <div className="search-page">
             <section className="search-hero">
                 <h1 className="search-title">Find your next movie</h1>
-                {showSearchBar ? (
-                    <p className="search-subtitle">
-                        Describe it in your own words — "a prison escape about friendship" — or switch to filters to search by genre, actor, year, and more.
-                    </p>
-                ) : (
-                    <p className="search-subtitle">
-                        Set any combination of fields below — no need to type a search query.
-                    </p>
-                )}
+                <p className="search-subtitle">
+                    {showSearchBar
+                        ? 'Say what you’re in the mood for — or switch to “Filter by details” to search on genre, actor, director, year, and more.'
+                        : 'Set any combination of fields below — no sentence needed.'}
+                </p>
 
                 {showSearchBar ? (
                     <form className="search-bar" onSubmit={submitText} role="search">
@@ -239,6 +254,7 @@ export default function SearchPage() {
                         </button>
                     ))}
                 </div>
+                <p className="mode-hint">{modeTitle(mode)}</p>
             </section>
 
             <section className="search-results">
