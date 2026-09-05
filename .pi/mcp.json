@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "logfire": {
+      "disabled": true
+    },
+    "playwright": {
+      "disabled": true
+    },
+    "sequential-thinking": {
+      "disabled": true
+    }
+  }
+}

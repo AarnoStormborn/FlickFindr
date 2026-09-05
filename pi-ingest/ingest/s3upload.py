@@ -25,9 +25,7 @@ def upload_parquet(s3_client, bucket: str, key: str, local_path: str) -> int:
 
 
 def make_s3_client(region: str):
-    kwargs: dict[str, str] = {}
-    if region:
-        kwargs["region_name"] = region
+    kwargs: dict[str, str] = {"region_name": region or "us-east-1"}
     # Credentials come from env (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) or
     # the well-known shared-credentials file — boto3 handles both by default.
     return boto3.client("s3", **kwargs)

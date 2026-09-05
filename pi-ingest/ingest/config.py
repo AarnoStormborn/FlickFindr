@@ -90,7 +90,7 @@ def load_config(argv: list[str] | None = None) -> Config:
     _load_dotenv()
     cfg = Config(
         tmdb_api_key=os.environ.get("TMDB_API_KEY", ""),
-        s3_bucket=os.environ.get("S3_BUCKET", ""),
+        s3_bucket=os.environ.get("S3_BUCKET") or os.environ.get("AWS_S3_BUCKET_NAME", ""),
         aws_region=os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "")),
         start_year=_env_int("START_YEAR", 1980),
         end_year=_env_int("END_YEAR", date.today().year),
