@@ -27,7 +27,8 @@
 }
 
 .category-title {
-    font-size: var(--font-size-xl);
+    font-family: var(--font-display);
+    font-size: var(--font-size-2xl);
     font-weight: 600;
     color: var(--text-primary);
     position: relative;
@@ -36,13 +37,13 @@
 .category-title::before {
     content: '';
     position: absolute;
-    left: -12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 4px;
-    height: 24px;
+    left: -14px;
+    top: 0.18em;
+    width: 3px;
+    height: 0.82em;
     background: var(--accent-gold);
     border-radius: 2px;
+    opacity: 0.85;
 }
 
 .category-see-more {
@@ -52,17 +53,19 @@
     padding: var(--space-sm) var(--space-md);
     background: transparent;
     border: none;
-    color: var(--accent-blue);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     cursor: pointer;
     transition: all var(--transition-fast);
-    border-radius: 6px;
+    border-radius: 999px;
 }
 
 .category-see-more:hover {
-    color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    color: var(--accent-gold);
+    background: var(--accent-gold-soft);
 }
 
 .category-see-more:hover svg {

@@ -10,7 +10,7 @@
 }
 
 .movie-card:hover {
-    transform: scale(1.05);
+    transform: translateY(-3px);
     z-index: 10;
 }
 
@@ -18,15 +18,17 @@
     position: relative;
     width: 100%;
     aspect-ratio: 2 / 3;
-    border-radius: var(--card-radius-lg);
+    border-radius: var(--card-radius);
     overflow: hidden;
     background: var(--bg-secondary);
+    border: 1px solid var(--line-faint);
     box-shadow: var(--shadow-sm);
     transition: box-shadow var(--transition-normal);
 }
 
 .movie-card:hover .movie-card-poster {
     box-shadow: var(--shadow-lg);
+    border-color: var(--line-subtle);
 }
 
 .movie-card-image {
@@ -43,22 +45,24 @@
 /* Rating Badge */
 .movie-card-rating {
     position: absolute;
-    top: var(--space-sm);
-    left: var(--space-sm);
+    top: 10px;
+    left: 10px;
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     padding: 4px 8px;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(4px);
-    border-radius: 6px;
-    font-size: var(--font-size-xs);
+    background: rgba(10, 10, 12, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid var(--line-faint);
+    border-radius: 999px;
+    font-size: 0.72rem;
     font-weight: 600;
 }
 
 .rating-star {
     color: var(--accent-gold);
-    font-size: 0.7rem;
+    font-size: 0.72rem;
 }
 
 .rating-value {
@@ -68,14 +72,16 @@
 /* Release Year Badge */
 .movie-card-year {
     position: absolute;
-    top: var(--space-sm);
-    right: var(--space-sm);
+    top: 10px;
+    right: 10px;
     padding: 4px 8px;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(4px);
-    border-radius: 6px;
-    font-size: var(--font-size-xs);
-    font-weight: 600;
+    background: rgba(10, 10, 12, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid var(--line-faint);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 500;
     color: var(--text-secondary);
 }
 
@@ -153,19 +159,21 @@
     gap: var(--space-xs);
     width: 100%;
     padding: var(--space-sm) var(--space-md);
-    background: var(--accent-gold);
-    color: #000;
-    border: none;
-    border-radius: 6px;
-    font-size: var(--font-size-xs);
+    background: rgba(217, 164, 65, 0.16);
+    color: var(--accent-gold);
+    border: 1px solid rgba(217, 164, 65, 0.4);
+    border-radius: 999px;
+    font-size: 0.76rem;
     font-weight: 600;
+    letter-spacing: 0.04em;
     cursor: pointer;
     transition: all var(--transition-fast);
+    backdrop-filter: blur(4px);
 }
 
 .overlay-button:hover {
-    background: #ffd700;
-    transform: scale(1.02);
+    background: var(--accent-gold);
+    color: #16130c;
 }
 
 /* Movie Card Skeleton */

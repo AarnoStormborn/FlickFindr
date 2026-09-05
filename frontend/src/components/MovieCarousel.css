@@ -33,8 +33,8 @@
     transform: translateY(-50%);
     width: 44px;
     height: 44px;
-    background: rgba(15, 23, 30, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(24, 24, 30, 0.9), rgba(13, 13, 17, 0.95));
+    border: 1px solid var(--line-subtle);
     border-radius: 50%;
     color: var(--text-primary);
     cursor: pointer;
@@ -45,7 +45,9 @@
     pointer-events: none;
     transition: all var(--transition-normal);
     z-index: 20;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-sm);
 }
 
 .carousel-arrow.visible {
@@ -55,8 +57,8 @@
 
 .carousel-arrow:hover {
     background: var(--bg-hover);
-    border-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-50%) scale(1.1);
+    border-color: rgba(217, 164, 65, 0.4);
+    color: var(--accent-gold);
 }
 
 .carousel-arrow-left {

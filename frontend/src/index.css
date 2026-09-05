@@ -1,5 +1,7 @@
 /* ========================================
    FlickFindr - Global Styles & Design System
+   Redesign direction: cinematic archive / editorial catalog
+   (see FRONTEND_DESIGN_INSPIRATION.md)
    ======================================== */
 
 /* CSS Reset & Base Styles */
@@ -12,38 +14,46 @@
 }
 
 :root {
-  /* Color Palette - Dark Theme */
-  --bg-primary: #0f171e;
-  --bg-secondary: #1a242f;
-  --bg-tertiary: #232f3e;
-  --bg-hover: #2a3a4d;
-  --bg-card: #1e2a38;
+  /* Color Palette - Cinematic Dark Canvas */
+  --bg-primary: #0b0b0f;
+  --bg-secondary: #141419;
+  --bg-tertiary: #1d1d24;
+  --bg-hover: #26262f;
+  --bg-card: #181820;
 
-  /* Text Colors */
-  --text-primary: #ffffff;
-  --text-secondary: #8d9ba8;
-  --text-muted: #5a6872;
+  /* Text Colors - warm ivory / greys */
+  --text-primary: #f2f0ea;
+  --text-secondary: #a3a09a;
+  --text-muted: #6b6863;
 
-  /* Accent Colors */
-  --accent-gold: #f5c518;
-  --accent-blue: #00a8e1;
-  --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* Accent - one restrained editorial amber (posters supply the colour) */
+  --accent-gold: #d9a441;
+  --accent-gold-soft: rgba(217, 164, 65, 0.16);
+  --accent-blue: #cfc6b8; /* desaturated warm tone used sparingly for links */
+  --accent-gradient: linear-gradient(135deg, #e0af52 0%, #b5852c 100%);
 
   /* UI Elements */
   --card-radius: 8px;
-  --card-radius-lg: 12px;
-  --navbar-height: 60px;
+  --card-radius-lg: 14px;
+  --panel-radius: 20px;
+  --navbar-height: 64px;
+  /* Total clearance below the floating navbar */
+  --nav-offset: calc(var(--navbar-height) + 26px);
 
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(245, 197, 24, 0.3);
+  /* Shadows - broad + soft */
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 22px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 44px rgba(0, 0, 0, 0.55);
+  --shadow-floating: 0 24px 80px rgba(0, 0, 0, 0.5);
+
+  /* Hairlines */
+  --line-subtle: rgba(255, 255, 255, 0.08);
+  --line-faint: rgba(255, 255, 255, 0.05);
 
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
-  --transition-slow: 400ms ease;
+  --transition-slow: 450ms ease;
 
   /* Spacing */
   --space-xs: 4px;
@@ -52,16 +62,19 @@
   --space-lg: 24px;
   --space-xl: 32px;
   --space-2xl: 48px;
+  --gutter-grid: 18px;
 
   /* Typography */
-  --font-family: 'Lora', Georgia, 'Times New Roman', serif;
-  --font-size-xs: 0.825rem;
-  --font-size-sm: 0.963rem;
-  --font-size-base: 1.1rem;
-  --font-size-lg: 1.238rem;
-  --font-size-xl: 1.375rem;
-  --font-size-2xl: 1.65rem;
-  --font-size-3xl: 2.2rem;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Bodoni Moda', Georgia, 'Times New Roman', serif;
+  --font-size-xs: 0.8rem;
+  --font-size-sm: 0.92rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.15rem;
+  --font-size-xl: 1.3rem;
+  --font-size-2xl: 1.7rem;
+  --font-size-3xl: 2.3rem;
+  --font-size-hero: clamp(2.6rem, 5vw, 4rem);
 }
 
 /* Base Styles */
@@ -93,9 +106,11 @@ h3,
 h4,
 h5,
 h6 {
+  font-family: var(--font-display);
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.15;
   color: var(--text-primary);
+  letter-spacing: 0.01em;
 }
 
 h1 {
@@ -111,13 +126,13 @@ h3 {
 }
 
 a {
-  color: var(--accent-blue);
+  color: var(--text-secondary);
   text-decoration: none;
   transition: color var(--transition-fast);
 }
 
 a:hover {
-  color: var(--accent-gold);
+  color: var(--text-primary);
 }
 
 /* Utility Classes */
@@ -145,11 +160,11 @@ a:hover {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-hover);
+  background: var(--bg-tertiary);
   border-radius: 4px;
 }
 
@@ -194,6 +209,3 @@ a:hover {
 .fade-in {
   animation: fadeIn var(--transition-slow) ease forwards;
 }
-
-/* Font Import - Lora from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap');

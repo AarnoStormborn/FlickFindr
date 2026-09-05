@@ -4,20 +4,20 @@
 
 .movie-details-page {
     min-height: 100vh;
-    padding-top: var(--navbar-height);
+    padding-top: var(--nav-offset);
     background: var(--bg-primary);
 }
 
 /* Back Button */
 .back-button {
     position: fixed;
-    top: calc(var(--navbar-height) + var(--space-md));
+    top: var(--nav-offset);
     left: var(--space-lg);
     display: flex;
     align-items: center;
     gap: var(--space-xs);
     padding: var(--space-sm) var(--space-md);
-    background: rgba(15, 23, 30, 0.9);
+    background: rgba(14, 14, 18, 0.8);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -68,17 +68,18 @@
 
 .movie-details-error button {
     padding: var(--space-md) var(--space-xl);
-    background: var(--accent-gold);
-    color: #000;
-    border: none;
-    border-radius: 8px;
+    background: rgba(217, 164, 65, 0.16);
+    color: var(--accent-gold);
+    border: 1px solid rgba(217, 164, 65, 0.4);
+    border-radius: 999px;
     font-weight: 600;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
 
 .movie-details-error button:hover {
-    background: #ffd700;
+    background: var(--accent-gold);
+    color: #16130c;
 }
 
 /* Hero Section */
@@ -110,8 +111,8 @@
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg,
-            rgba(15, 23, 30, 0.3) 0%,
-            rgba(15, 23, 30, 0.8) 50%,
+            rgba(12, 12, 16, 0.35) 0%,
+            rgba(12, 12, 16, 0.82) 55%,
             var(--bg-primary) 100%);
 }
 
@@ -200,16 +201,16 @@
 }
 
 .metascore.good {
-    background: #66cc33;
+    background: #5a8f5f;
 }
 
 .metascore.mixed {
-    background: #ffcc33;
-    color: #000;
+    background: #b08d3a;
+    color: #16130c;
 }
 
 .metascore.bad {
-    background: #ff0000;
+    background: #a64b40;
 }
 
 /* Genres */

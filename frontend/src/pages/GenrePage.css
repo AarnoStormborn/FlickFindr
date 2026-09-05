@@ -4,20 +4,20 @@
 
 .genre-page {
     min-height: 100vh;
-    padding: var(--navbar-height) 10% var(--space-2xl);
+    padding: var(--nav-offset) 10% var(--space-2xl);
     background: var(--bg-primary);
 }
 
 /* Back Button */
 .genre-page .back-button {
     position: fixed;
-    top: calc(var(--navbar-height) + var(--space-md));
+    top: var(--nav-offset);
     left: 10%;
     display: flex;
     align-items: center;
     gap: var(--space-xs);
     padding: var(--space-sm) var(--space-md);
-    background: rgba(15, 23, 30, 0.9);
+    background: rgba(14, 14, 18, 0.8);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -90,7 +90,7 @@
 
 .sort-btn.active {
     background: var(--accent-gold);
-    color: #000;
+    color: #16130c;
     border-color: var(--accent-gold);
 }
 
@@ -131,10 +131,10 @@
 
 .genre-error button {
     padding: var(--space-md) var(--space-xl);
-    background: var(--accent-gold);
-    color: #000;
-    border: none;
-    border-radius: 8px;
+    background: rgba(217, 164, 65, 0.16);
+    color: var(--accent-gold);
+    border: 1px solid rgba(217, 164, 65, 0.4);
+    border-radius: 999px;
     font-weight: 600;
     cursor: pointer;
     margin-top: var(--space-md);

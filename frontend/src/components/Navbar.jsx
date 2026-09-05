@@ -8,8 +8,7 @@ export default function Navbar() {
             <div className="navbar-container">
                 {/* Logo */}
                 <NavLink to="/" className="navbar-logo">
-                    <span className="logo-icon">🎬</span>
-                    <span className="logo-text">FlickFindr</span>
+                    <span className="logo-mark">Flick<em>Findr</em></span>
                 </NavLink>
 
                 {/* Navigation Links */}
