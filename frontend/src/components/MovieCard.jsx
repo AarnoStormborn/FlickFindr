@@ -48,11 +48,17 @@ export default function MovieCard({ movie }) {
                     </div>
                 )}
 
+                {/* Release Year Badge */}
+                {movie.release_year && (
+                    <div className="movie-card-year">{movie.release_year}</div>
+                )}
+
                 {/* Hover Overlay */}
                 <div className="movie-card-overlay">
                     <div className="overlay-content">
                         <h3 className="overlay-title">{movie_name}</h3>
                         <div className="overlay-meta">
+                            {movie.release_year && <span className="overlay-year">{movie.release_year}</span>}
                             {genre && <span className="overlay-genre">{genre.split(',')[0]}</span>}
                             {runtime && <span className="overlay-runtime">{formatRuntime(runtime)}</span>}
                         </div>

@@ -65,6 +65,20 @@
     color: var(--text-primary);
 }
 
+/* Release Year Badge */
+.movie-card-year {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    border-radius: 6px;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
 /* Hover Overlay */
 .movie-card-overlay {
     position: absolute;
@@ -123,6 +137,13 @@
 
 .overlay-runtime {
     color: var(--text-muted);
+}
+
+.overlay-year {
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 4px;
+    font-weight: 600;
 }
 
 .overlay-button {

@@ -100,7 +100,10 @@ export default function MovieDetailsPage() {
 
                     {/* Info */}
                     <div className="movie-info">
-                        <h1 className="movie-title">{movie.movie_name}</h1>
+                        <h1 className="movie-title">
+                            {movie.movie_name}
+                            {movie.release_year && <span className="movie-year-inline"> ({movie.release_year})</span>}
+                        </h1>
 
                         {/* Meta Info */}
                         <div className="movie-meta">
