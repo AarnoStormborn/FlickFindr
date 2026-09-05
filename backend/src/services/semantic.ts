@@ -4,7 +4,7 @@ import { toMovieResult } from "./structural.js";
 
 export const SIMILARITY_THRESHOLD = 0.6;
 
-const SIMILARITY_SELECT = `${"id, movie_name, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url"},\n  1 - (plot_embedding <=> CAST($1 AS vector)) AS similarity_score`;
+const SIMILARITY_SELECT = `${"id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url"},\n  1 - (plot_embedding <=> CAST($1 AS vector)) AS similarity_score`;
 
 function toSemanticResult(row: Record<string, unknown>): MovieResult {
   const movie = toMovieResult(row);

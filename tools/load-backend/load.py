@@ -92,12 +92,13 @@ def _rows_from_s3(s3, bucket: str, key: str):
 
 
 UPSERT = """
-INSERT INTO movies (tmdb_id, movie_name, rating, runtime, genre, metascore, plot,
+INSERT INTO movies (tmdb_id, movie_name, release_year, rating, runtime, genre, metascore, plot,
                     directors, stars, votes, gross, poster_url)
-VALUES (%(tmdb_id)s, %(movie_name)s, %(rating)s, %(runtime)s, %(genre)s, NULL,
+VALUES (%(tmdb_id)s, %(movie_name)s, %(release_year)s, %(rating)s, %(runtime)s, %(genre)s, NULL,
         %(plot)s, %(directors)s, %(stars)s, %(votes)s, %(gross)s, %(poster_url)s)
 ON CONFLICT (tmdb_id) DO UPDATE SET
-  movie_name = EXCLUDED.movie_name, rating = EXCLUDED.rating,
+  movie_name = EXCLUDED.movie_name, release_year = EXCLUDED.release_year,
+  rating = EXCLUDED.rating,
   runtime = EXCLUDED.runtime, genre = EXCLUDED.genre, plot = EXCLUDED.plot,
   directors = EXCLUDED.directors, stars = EXCLUDED.stars, votes = EXCLUDED.votes,
   gross = EXCLUDED.gross, poster_url = EXCLUDED.poster_url
@@ -129,6 +130,7 @@ def main() -> None:
                     cur.execute(UPSERT, {
                         "tmdb_id": row["tmdb_id"],
                         "movie_name": (row.get("movie_name") or "")[:255] or f"Movie {row['tmdb_id']}",
+                        "release_year": row.get("release_year"),
                         "rating": row.get("rating"),
                         "runtime": row.get("runtime"),
                         "genre": row.get("genre"),

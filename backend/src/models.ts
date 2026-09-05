@@ -50,6 +50,7 @@ export type HybridSearchRequest = z.infer<typeof HybridSearchRequestSchema>;
 export interface MovieRow {
   id: number;
   movie_name: string;
+  release_year: number | null;
   rating: number | null;
   runtime: number | null;
   genre: string | null;

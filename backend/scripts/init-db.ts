@@ -19,6 +19,7 @@ async function main(): Promise<void> {
         id SERIAL PRIMARY KEY,
         tmdb_id INTEGER UNIQUE,
         movie_name VARCHAR(255) NOT NULL,
+        release_year INTEGER,
         rating FLOAT,
         runtime INTEGER,
         genre TEXT,
@@ -34,6 +35,7 @@ async function main(): Promise<void> {
     `);
     // Migration for pre-existing databases (idempotent).
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS tmdb_id INTEGER");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS release_year INTEGER");
     // Plain unique index (NULLs allowed — they are distinct), so
     // ON CONFLICT (tmdb_id) resolves. Replaces any older partial index.
     await pool.query("DROP INDEX IF EXISTS idx_movies_tmdb_id");

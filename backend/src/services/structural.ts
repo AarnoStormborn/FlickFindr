@@ -8,13 +8,14 @@ import type {
   StructuralSearchRequest,
 } from "../models.js";
 
-export const MOVIE_COLUMNS = `id, movie_name, rating, runtime, genre, metascore, plot,
+export const MOVIE_COLUMNS = `id, movie_name, release_year, rating, runtime, genre, metascore, plot,
   directors, stars, votes, gross, poster_url`;
 
 function toMovieResult(row: Record<string, unknown>): MovieResult {
   return {
     id: Number(row.id),
     movie_name: String(row.movie_name ?? ""),
+    release_year: row.release_year === null || row.release_year === undefined ? null : Number(row.release_year),
     rating: row.rating === null ? null : Number(row.rating),
     runtime: row.runtime === null ? null : Number(row.runtime),
     genre: row.genre === null ? null : String(row.genre),

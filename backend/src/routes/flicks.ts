@@ -15,7 +15,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       const skip = Number((request.query as Record<string, unknown>).skip ?? 0);
       const limit = Number((request.query as Record<string, unknown>).limit ?? 10);
       const { rows } = await db.query(
-        "SELECT id, movie_name, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ORDER BY rating DESC NULLS LAST LIMIT $1 OFFSET $2",
+        "SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ORDER BY rating DESC NULLS LAST LIMIT $1 OFFSET $2",
         [limit, skip],
       );
       if (rows.length === 0) return reply.code(404).send({ detail: "Movies not found" });
@@ -31,7 +31,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
     try {
       const movieId = Number((request.params as Record<string, unknown>).movie_id);
       const { rows } = await db.query(
-        "SELECT id, movie_name, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies WHERE id = $1",
+        "SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies WHERE id = $1",
         [movieId],
       );
       if (rows.length === 0) {
@@ -61,7 +61,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       const limit = Number(q.limit ?? 10);
       params.push(limit, skip);
       const { rows } = await db.query(
-        `SELECT id, movie_name, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ${
+        `SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ${
           where.length ? `WHERE ${where.join(" AND ")}` : ""
         } ORDER BY rating DESC NULLS LAST LIMIT $${params.length - 1} OFFSET $${params.length}`,
         params,
