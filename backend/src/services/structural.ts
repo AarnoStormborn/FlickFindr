@@ -86,6 +86,11 @@ export function buildStructuralQuery(req: StructuralSearchRequest): StructuralQu
     whereParams.push(req.max_year);
     where.push(`release_year <= $${whereParams.length}`);
   }
+  if (req.min_votes !== undefined) {
+    // votes is stored as text; cast for a numeric comparison.
+    whereParams.push(req.min_votes);
+    where.push(`NULLIF(votes, '')::int >= $${whereParams.length}`);
+  }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const order = req.sort_order === "desc" ? "DESC" : "ASC";

@@ -89,6 +89,9 @@ export async function searchMovies(params = {}) {
     if (params.maxRating != null) body.max_rating = params.maxRating;
     if (params.minRuntime != null) body.min_runtime = params.minRuntime;
     if (params.maxRuntime != null) body.max_runtime = params.maxRuntime;
+    if (params.minYear != null) body.min_year = params.minYear;
+    if (params.maxYear != null) body.max_year = params.maxYear;
+    if (params.minVotes != null) body.min_votes = params.minVotes;
     body.sort_by = params.sortBy || 'rating';
     body.sort_order = params.sortOrder || 'desc';
     body.skip = params.skip || 0;
@@ -109,12 +112,13 @@ export async function searchMovies(params = {}) {
 /**
  * Get movies by genre - convenience wrapper
  */
-export async function getMoviesByGenre(genre, limit = 15) {
+export async function getMoviesByGenre(genre, limit = 15, minVotes = 0) {
     return searchMovies({
         genre,
         sortBy: 'rating',
         sortOrder: 'desc',
         limit,
+        minVotes,
     });
 }
 

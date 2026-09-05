@@ -7,81 +7,112 @@ import { getMoviesByGenre, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
 import './MoviesPage.css';
 
-// Categories to display - curated list for best experience.
-// `genres` are the real DB genre names (TMDB naming); `seeMoreGenre` is the
-// genre used for the "See more" link.
-const FEATURED_GENRES = [
+const CURRENT_YEAR = new Date().getFullYear();
+
+/** Shelves use a vote floor so a handful of votes can't game the rating sort. */
+const BEST_OF_MIN_VOTES = 1000;
+const LATEST_MIN_VOTES = 300;
+
+/** Curated year-based shelves shown first. */
+const YEAR_SHELVES = [
+    {
+        id: 'latest',
+        displayName: 'Latest Releases',
+        caption: 'Fresh from the last two years',
+        load: () => searchMovies({ minYear: CURRENT_YEAR - 2, maxYear: CURRENT_YEAR, limit: 15, minVotes: LATEST_MIN_VOTES, sortBy: 'release_year', sortOrder: 'desc' }),
+    },
+    {
+        id: 'retro',
+        displayName: 'Going Retro',
+        caption: 'Totally rad picks from the 80s',
+        load: () => searchMovies({ minYear: 1980, maxYear: 1989, limit: 15, minVotes: BEST_OF_MIN_VOTES, sortBy: 'rating', sortOrder: 'desc' }),
+    },
+    {
+        id: 'millennium',
+        displayName: 'The Millennium Classics',
+        caption: 'The best of 2000–2009',
+        load: () => searchMovies({ minYear: 2000, maxYear: 2009, limit: 15, minVotes: BEST_OF_MIN_VOTES, sortBy: 'rating', sortOrder: 'desc' }),
+    },
+];
+
+/** Curated genre rows shown after the year shelves. */
+const GENRE_ROWS = [
     { id: 'drama', displayName: 'Top Drama', genres: ['Drama'], seeMoreGenre: 'Drama' },
     { id: 'action', displayName: 'Action & Adventure', genres: ['Action', 'Adventure'], seeMoreGenre: 'Action' },
     { id: 'comedy', displayName: 'Comedy', genres: ['Comedy'], seeMoreGenre: 'Comedy' },
-    { id: 'crime', displayName: 'Crime & Thriller', genres: ['Crime', 'Thriller'], seeMoreGenre: 'Crime' },
-    { id: 'romance', displayName: 'Romance', genres: ['Romance'], seeMoreGenre: 'Romance' },
     { id: 'scifi', displayName: 'Sci-Fi & Fantasy', genres: ['Science Fiction', 'Fantasy'], seeMoreGenre: 'Science Fiction' },
-    { id: 'horror', displayName: 'Horror', genres: ['Horror'], seeMoreGenre: 'Horror' },
-    { id: 'animation', displayName: 'Animation & Family', genres: ['Animation', 'Family'], seeMoreGenre: 'Animation' },
 ];
+
+const ALL_ROWS = [...YEAR_SHELVES, ...GENRE_ROWS];
+
+/** Merge multiple result sets, dedupe by id, keep top N by rating desc. */
+function mergeTop(perFetch, top = 15) {
+    const seen = new Set();
+    const merged = [];
+    perFetch
+        .flatMap((res) => res.results ?? [])
+        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+        .forEach((m) => {
+            if (seen.has(m.id)) return;
+            seen.add(m.id);
+            merged.push(m);
+        });
+    return merged.slice(0, top);
+}
 
 export default function MoviesPage() {
     const navigate = useNavigate();
-    const [categoryData, setCategoryData] = useState({});
+    const [rowData, setRowData] = useState({});
     const [loading, setLoading] = useState({});
     const [error, setError] = useState(null);
     const [view, setView] = useViewMode();
     const [topMovies, setTopMovies] = useState([]);
     const [topLoading, setTopLoading] = useState(false);
 
-    // Fetch movies for each featured category on mount.
+    // Fetch each shelf/row on mount.
     useEffect(() => {
-        const fetchAllCategories = async () => {
+        const fetchAll = async () => {
             const loadingState = {};
-            FEATURED_GENRES.forEach((g) => (loadingState[g.id] = true));
+            ALL_ROWS.forEach((r) => (loadingState[r.id] = true));
             setLoading(loadingState);
 
-            // Each category may span multiple genres — fetch in parallel,
-            // merge with dedupe, sort by rating desc.
-            const fetchPromises = FEATURED_GENRES.map(async (cat) => {
+            const promises = ALL_ROWS.map(async (row) => {
                 try {
-                    const perGenre = await Promise.all(
-                        cat.genres.map((g) => getMoviesByGenre(g, 15)),
-                    );
-                    const seen = new Set();
-                    const merged = [];
-                    perGenre
-                        .flatMap((res) => res.results ?? [])
-                        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-                        .forEach((m) => {
-                            if (seen.has(m.id)) return;
-                            seen.add(m.id);
-                            merged.push(m);
-                        });
-                    return { id: cat.id, data: merged.slice(0, 15) };
+                    let movies;
+                    if (row.load) {
+                        const res = await row.load();
+                        movies = res.results ?? [];
+                    } else {
+                        const perGenre = await Promise.all(row.genres.map((g) => getMoviesByGenre(g, 15, BEST_OF_MIN_VOTES)));
+                        movies = mergeTop(perGenre, 15);
+                    }
+                    return { id: row.id, data: movies };
                 } catch (err) {
-                    console.error(`Failed to fetch ${cat.displayName}:`, err);
-                    return { id: cat.id, data: [] };
+                    console.error(`Failed to fetch ${row.displayName}:`, err);
+                    return { id: row.id, data: [] };
                 }
             });
 
             try {
-                const results = await Promise.all(fetchPromises);
-                const newCategoryData = {};
-                const newLoading = {};
-                results.forEach(({ id, data }) => {
-                    newCategoryData[id] = data;
-                    newLoading[id] = false;
+                const results = await Promise.all(promises);
+                const data = {};
+                const done = {};
+                results.forEach(({ id, data: movies }) => {
+                    data[id] = movies;
+                    done[id] = false;
                 });
-                setCategoryData(newCategoryData);
-                setLoading(newLoading);
+                setRowData(data);
+                setLoading(done);
             } catch (err) {
-                console.error('Failed to fetch categories:', err);
+                console.error('Failed to fetch rows:', err);
                 setError('Failed to load movies. Please try again later.');
             }
         };
-
-        fetchAllCategories();
+        fetchAll();
     }, []);
 
-    const handleSeeMore = (category) => {
-        navigate(`/genre/${category.seeMoreGenre}`);
+    const handleSeeMore = (genre) => {
+        navigate(`/genre/${genre}`);
     };
 
     // Load a broad, top-rated set the first time list view is opened.
@@ -108,6 +139,17 @@ export default function MoviesPage() {
         );
     }
 
+    const renderShelf = (row, isGenre) => (
+        <CategoryRow
+            key={row.id}
+            title={row.displayName}
+            caption={row.caption}
+            movies={rowData[row.id] || []}
+            isLoading={loading[row.id]}
+            onSeeMore={isGenre ? () => handleSeeMore(row.seeMoreGenre) : undefined}
+        />
+    );
+
     return (
         <main className="movies-page">
             {/* Hero Section */}
@@ -127,18 +169,12 @@ export default function MoviesPage() {
                 <div className="hero-gradient"></div>
             </section>
 
-            {/* Category Rows */}
+            {/* Shelves */}
             {view === 'grid' ? (
                 <div className="movies-categories">
-                    {FEATURED_GENRES.map((cat) => (
-                        <CategoryRow
-                            key={cat.id}
-                            title={cat.displayName}
-                            movies={categoryData[cat.id] || []}
-                            isLoading={loading[cat.id]}
-                            onSeeMore={() => handleSeeMore(cat)}
-                        />
-                    ))}
+                    {YEAR_SHELVES.map((row) => renderShelf(row, false))}
+                    <div className="genre-row-divider" />
+                    {GENRE_ROWS.map((row) => renderShelf(row, true))}
                 </div>
             ) : (
                 <div className="movies-categories">

@@ -22,6 +22,7 @@ export const StructuralSearchRequestSchema = z.object({
   max_runtime: z.number().int().min(0).optional(),
   min_year: z.number().int().min(1880).max(2100).optional(),
   max_year: z.number().int().min(1880).max(2100).optional(),
+  min_votes: z.number().int().min(0).optional(),
   sort_by: SortBySchema,
   sort_order: SortOrderSchema,
   skip: z.number().int().min(0).default(0),

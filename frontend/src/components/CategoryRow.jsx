@@ -1,11 +1,14 @@
 import MovieCarousel from './MovieCarousel';
 import './CategoryRow.css';
 
-export default function CategoryRow({ title, movies, isLoading, onSeeMore }) {
+export default function CategoryRow({ title, caption, movies, isLoading, onSeeMore }) {
     return (
         <section className="category-row fade-in">
             <div className="category-header">
-                <h2 className="category-title">{title}</h2>
+                <div className="category-heading">
+                    <h2 className="category-title">{title}</h2>
+                    {caption && <p className="category-caption">{caption}</p>}
+                </div>
                 {onSeeMore && (
                     <button className="category-see-more" onClick={onSeeMore}>
                         See more

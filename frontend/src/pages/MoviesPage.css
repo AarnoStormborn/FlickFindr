@@ -76,6 +76,13 @@
     padding: 0 10%;
 }
 
+/* Visual separator between the year shelves and genre rows */
+.genre-row-divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.08), transparent);
+    margin-bottom: var(--space-2xl);
+}
+
 /* Hero View Toggle */
 .hero-view-toggle {
     display: flex;
