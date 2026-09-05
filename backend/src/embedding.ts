@@ -31,27 +31,38 @@ function zeroVector(): number[] {
   return new Array<number>(EMBEDDING_DIM).fill(0);
 }
 
-function meanPool(output: { dims?: number[]; data: Float32Array }): number[] {
-  // output.dims: [batch, tokens, hidden] — take the batch-0 tensor
-  const batch = output.dims?.[0] ?? 1;
-  const tokens = output.dims?.[1] ?? 1;
-  const hidden = output.data.length / (batch * tokens);
-  const pooled = new Array<number>(hidden).fill(0);
-  for (let t = 0; t < tokens; t++) {
-    const offset = t * hidden;
-    for (let h = 0; h < hidden; h++) {
-      pooled[h] = (pooled[h] ?? 0) + (output.data[offset + h] ?? 0);
-    }
-  }
-  for (let h = 0; h < hidden; h++) {
-    pooled[h] = (pooled[h] ?? 0) / tokens;
-  }
-  return pooled;
-}
-
 function normalize(vec: number[]): number[] {
   const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0)) || 1;
   return vec.map((v) => v / norm);
+}
+
+/**
+ * Mean-pool (+normalize) every sequence in an output tensor.
+ * Accepts dims [B, seq, H] (batched) or [seq, H] (single) and returns one
+ * vector per sequence in the batch.
+ */
+function meanPoolTensor(output: { dims?: number[]; data: Float32Array }): number[][] {
+  const dims = output.dims ?? [1, output.data.length, 1];
+  // 3D always means [batch, seq, hidden] (batch may be 1).
+  const isBatched = dims.length >= 3;
+  const b = isBatched ? (dims[0] ?? 1) : 1;
+  const s = isBatched ? (dims[1] ?? 1) : (dims[0] ?? 1);
+  const h = output.data.length / (b * s) || 1;
+  const vectors: number[][] = [];
+  for (let bb = 0; bb < b; bb++) {
+    const pooled = new Array<number>(h).fill(0);
+    for (let t = 0; t < s; t++) {
+      const offset = (bb * s + t) * h;
+      for (let k = 0; k < h; k++) {
+        pooled[k] = (pooled[k] ?? 0) + (output.data[offset + k] ?? 0);
+      }
+    }
+    for (let k = 0; k < h; k++) {
+      pooled[k] = (pooled[k] ?? 0) / s;
+    }
+    vectors.push(normalize(pooled));
+  }
+  return vectors;
 }
 
 /** Generate a single 384-dim embedding for text. Zero vector for empty input. */
@@ -60,8 +71,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   const extractor = await getPipeline();
   const output = await extractor(text, { pooling: "none" });
   const tensor = Array.isArray(output) ? output[0] : output;
-  const pooled = meanPool(tensor);
-  return normalize(pooled);
+  return meanPoolTensor(tensor)[0] ?? zeroVector();
 }
 
 /** Batch embedding with a fixed batch size. */
@@ -73,11 +83,11 @@ export async function batchGenerateEmbeddings(
   const result: number[][] = [];
   for (let i = 0; i < texts.length; i += batchSize) {
     const chunk = texts.slice(i, i + batchSize);
-    const outputs = await extractor(chunk, { pooling: "none" });
-    const tensors = Array.isArray(outputs) ? outputs : [outputs];
-    tensors.forEach((tensor, idx) => {
-      const text = chunk[idx] ?? "";
-      result.push(text && text.trim() ? normalize(meanPool(tensor)) : zeroVector());
+    const output = await extractor(chunk, { pooling: "none" });
+    const tensor = Array.isArray(output) ? output[0] : output;
+    const vectors = meanPoolTensor(tensor);
+    chunk.forEach((text, idx) => {
+      result.push(text && text.trim() ? (vectors[idx] ?? zeroVector()) : zeroVector());
     });
   }
   logger.info(`Generated ${result.length} embeddings`);
