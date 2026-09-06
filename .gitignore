@@ -1,3 +1,6 @@
 .env
 .venv/
 .recap/
+
+# Local Pi agent config (never share)
+.pi/
