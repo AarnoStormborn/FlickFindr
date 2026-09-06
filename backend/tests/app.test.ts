@@ -38,6 +38,7 @@ async function fakeDb(): Promise<Queryable> {
 
 const agentParse = async (query: string): Promise<HybridSearchRequest> => ({
   query,
+  skip: 0,
   limit: 10,
   genre: "Action",
 });
