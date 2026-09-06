@@ -1,7 +1,7 @@
 # FlickFindr V1 — Deployment Guide (hybrid: Vercel + single $0 VPS)
 
 **Frontend** → Vercel (free tier: CDN, auto previews per PR, no server to run).
-**Backend + Postgres + Redis** → one always-on Oracle **Always Free** ARM VM.
+**Backend + Postgres + Redis** → one small Hetzner CX22 VPS (~€3.79/mo).
 The Vercel app calls the API over HTTPS (Caddy auto-TLS on the VPS).
 
 ```
@@ -13,15 +13,19 @@ VPS (docker compose): postgres(pgvector) + redis + backend + caddy
 
 ## Part A — Backend on the VPS
 
-### 1. Create the VM (Oracle Always Free)
+### 1. Create the VM (Hetzner)
 
-1. Sign up at cloud.oracle.com (card for identity; ARM free tier doesn't bill).
-2. Create a **VM.Standard.A1.Flex**: 4 OCPU / 24 GB RAM, Ubuntu 22.04/24.04.
-   - Add your **SSH public key** during creation.
-3. In the VCN security list open **80/tcp** and **443/tcp**.
-4. Reserve a static **public IP** (optional but recommended).
+1. Sign up at hetzner.com (billing ~€3.79/mo for CX22 — no hidden charges).
+2. Create a **CX22** (x86, 2 vCPU / 4 GB RAM, 40 GB) running **Ubuntu 22.04/24.04**.
+   - CX22 is plenty for this stack (30k-row catalog, single user).
+   - Optional: enable automatic backups (~20% extra) — cheap insurance.
+3. Add your **SSH public key** during creation.
+4. In the firewall settings, allow **22**, **80**, **443** (Hetzner firewall is
+   easy to attach to the instance).
 
-> If Oracle signup is painful, Hetzner CX22 (~€4/mo) works identically.
+> Why not Oracle Always Free? It is genuinely $0 with no expiry, but signup
+> rejection + ARM capacity roulette + 7-day idle reclamation made it more
+> hassle than ~€4/mo is worth for an app you'll actually use.
 
 ### 2. One-time box setup
 
