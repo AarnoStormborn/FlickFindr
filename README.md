@@ -24,4 +24,13 @@ cd frontend && npm install && npm run dev  # UI  → http://localhost:5173
 
 After ingesting data, populate embeddings: `cd backend && npm run embeddings`.
 
+## Deployment (production)
+
+Free, managed stack — see [`deploy/README.md`](deploy/README.md):
+
+- **Frontend** → Vercel (static React build, `VITE_API_URL` set at build time)
+- **Backend** → Render free web service (auto-deploy from GitHub, `render.yaml`)
+- **Database** → Supabase free tier (Postgres + pgvector; `supabase/schema.sql`)
+- **Catalog data** → S3 parquet → Supabase via `tools/load-backend/load.py`
+
 See `backend/README.md` for the API surface and agent configuration.

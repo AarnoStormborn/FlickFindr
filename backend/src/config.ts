@@ -12,18 +12,23 @@ function parseCorsOrigins(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+const db = {
+  host: process.env.DB_HOST ?? "localhost",
+  port: Number(process.env.DB_PORT ?? 5433),
+  name: process.env.DB_NAME ?? "flickfindr",
+  user: process.env.DB_USER ?? "flickfindr",
+  password: process.env.DB_PASSWORD ?? "flickfindr",
+};
+
+// A single connection string overrides the individual parts (Supabase,
+// Neon, and managed hosts expose one postgres:// URL with special chars).
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  `postgresql://${db.user}:${db.password}@${db.host}:${db.port}/${db.name}`;
+
 export const config = {
-  db: {
-    host: process.env.DB_HOST ?? "localhost",
-    port: Number(process.env.DB_PORT ?? 5433),
-    name: process.env.DB_NAME ?? "flickfindr",
-    user: process.env.DB_USER ?? "flickfindr",
-    password: process.env.DB_PASSWORD ?? "flickfindr",
-  },
-  databaseUrl: (): string => {
-    const { host, port, name, user, password } = config.db;
-    return `postgresql://${user}:${password}@${host}:${port}/${name}`;
-  },
+  databaseUrl,
+  db,
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6380",
   port: Number(process.env.PORT ?? 8001),
   logLevel: process.env.LOG_LEVEL ?? "info",

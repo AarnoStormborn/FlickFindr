@@ -1,104 +1,92 @@
-# FlickFindr V1 — Deployment Guide (hybrid: Vercel + single $0 VPS)
+# FlickFindr — Deployment Guide (Render + Supabase, ~$0/mo)
 
-**Frontend** → Vercel (free tier: CDN, auto previews per PR, no server to run).
-**Backend + Postgres + Redis** → one small Hetzner CX22 VPS (~€3.79/mo).
-The Vercel app calls the API over HTTPS (Caddy auto-TLS on the VPS).
+Cheap, managed, zero-ops deployment:
+
+- **Frontend** → Vercel (free): static React build, CDN, PR previews.
+- **Backend (Fastify API)** → Render free web service (auto-deploys from GitHub).
+- **Database (Postgres + pgvector)** → Supabase free tier.
+- **Data archive** → AWS S3 (from the Pi-ingest pipeline), loaded into Supabase once.
 
 ```
 Browser
-  ├── https://<vercel-app>.vercel.app  -> Vercel (React static)
-  └── API calls (VITE_API_URL)  ->  https://api.<domain>  -> Caddy -> backend:8000
-VPS (docker compose): postgres(pgvector) + redis + backend + caddy
+ ├─ https://<vercel-app>.vercel.app   → Vercel (React static)
+ └─ API calls (VITE_API_URL)          → https://<render-service>.onrender.com
+                                          → Fastify → Supabase (Postgres+pgvector)
 ```
 
-## Part A — Backend on the VPS
+## 1. Supabase (database)
 
-### 1. Create the VM (Hetzner)
+1. Create a free project at supabase.com.
+2. In **SQL Editor**, run the contents of `supabase/schema.sql`
+   (enables `vector`, creates `movies`, adds an HNSW index).
+   *Or* from `backend/`: `DATABASE_URL=<conn> npm run init:db`.
+3. Copy the **connection string** (Project Settings → Database → Connection
+   string → URI). This is your `DATABASE_URL`.
 
-1. Sign up at hetzner.com (billing ~€3.79/mo for CX22 — no hidden charges).
-2. Create a **CX22** (x86, 2 vCPU / 4 GB RAM, 40 GB) running **Ubuntu 22.04/24.04**.
-   - CX22 is plenty for this stack (30k-row catalog, single user).
-   - Optional: enable automatic backups (~20% extra) — cheap insurance.
-3. Add your **SSH public key** during creation.
-4. In the firewall settings, allow **22**, **80**, **443** (Hetzner firewall is
-   easy to attach to the instance).
+> Free tier: 500 MB (our ~30k-row catalog fits comfortably), pauses after 1
+> week idle (a weekly visit keeps it alive).
 
-> Why not Oracle Always Free? It is genuinely $0 with no expiry, but signup
-> rejection + ARM capacity roulette + 7-day idle reclamation made it more
-> hassle than ~€4/mo is worth for an app you'll actually use.
+## 2. Render (backend)
 
-### 2. One-time box setup
+1. Push this repo to GitHub.
+2. In Render → **New → Blueprint** → select the repo → it reads `render.yaml`.
+   (Or: New → Web Service → root dir `backend`, runtime Node, build
+   `npm ci && npm run build`, start `node dist/src/index.js`, plan Free.)
+3. In the service **Environment**, set:
+   - `DATABASE_URL` — your Supabase connection string
+   - `CORS_ORIGINS` — your Vercel app URL (e.g. `https://flickfindr.vercel.app`)
+   - `AGENT_ENABLED` — `true` (agent search; small LLM cost) or `false`
+   - `PI_MODEL` — optional cheapest model id (empty = first available)
+   - `TMDB_API_KEY` — optional (only if ingest runs here)
+4. Deploy. Render auto-deploys on every push to `main` (backend changes).
 
-```bash
-ssh ubuntu@<VPS_IP>
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER          # re-login after
-docker compose version
+> Free tier spins down after 15 min idle → first request after idle takes
+> ~30–60s. **Fix:** ping it every ~10 min (UptimeRobot free, or a cron on
+> your Pi). The backend pre-warms its embedding model in the background on
+> boot, so warm requests are fast.
 
-sudo mkdir -p /opt/flickfindr && sudo chown $USER:$USER /opt/flickfindr
-cd /opt/flickfindr
-git clone <repo> .
-```
+## 3. Vercel (frontend)
 
-### 3. Environment (once)
+1. In Vercel: **Add New Project** → import repo → **Root Directory: `frontend`**.
+   (Framework auto-detects Vite.)
+2. Environment variable (build time): `VITE_API_URL` = your Render URL
+   (e.g. `https://flickfindr-backend.onrender.com`).
+3. Deploy. Auto-deploys on frontend pushes; PRs get previews.
 
-```bash
-cd /opt/flickfindr/deploy
-cp .env.prod.example .env
-nano .env    # set: API_DOMAIN, CORS_ORIGINS, POSTGRES_PASSWORD, PI_MODEL, TMDB_API_KEY
-```
+> `VITE_API_URL` is baked in at build time. Changing it = redeploy.
 
-Key vars:
+## 4. Load the catalog (S3 parquet → Supabase)
 
-| Var | Notes |
-|---|---|
-| `API_DOMAIN` | The API host, e.g. `api.flickfindr.example.com` |
-| `CORS_ORIGINS` | Your Vercel app URL(s) — the browser origin(s) allowed to call the API |
-| `POSTGRES_PASSWORD` | Strong random value |
-| `AGENT_ENABLED` | `true` = agent search (small LLM cost/search), `false` = free plain search |
-| `PI_MODEL` | Cheap model id for the agent (empty = first available) |
-
-Point `api.<domain>` (an **A record**) at the VPS IP → Caddy issues certs automatically.
-
-### 4. First deploy
+From your laptop (or anywhere with AWS creds + the repo):
 
 ```bash
-cd /opt/flickfindr
-docker compose -f deploy/docker-compose.prod.yml up -d --build
-curl -s https://api.<domain>/search/stats     # expect JSON
-```
-
-Backend pre-warms the embedding model on first boot (~90 MB into `hfcache`).
-
-### 5. Load the catalog (S3 -> prod Postgres)
-
-```bash
-# from your laptop, tunnel to the box:
-ssh -L 5433:localhost:5433 ubuntu@<VPS_IP>
 cd tools/load-backend
-DB_PORT=5433 python load.py                 # streams S3 parquet -> prod DB
+pip install -r requirements.txt          # first time (venv)
+export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+export DATABASE_URL="<supabase-connection-string>"
+python load.py                            # streams S3 parquet → movies table
 ```
 
-### 6. CI deploys (after the box is proven)
+Then generate embeddings for the new rows (plots → `plot_embedding`):
 
-GitHub secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_PORT`, `VPS_SSH_KEY`.
-Push to `main` (when backend/deploy files change) → `.github/workflows/deploy.yml`
-verifies then SSHs in: `git reset --hard`, `docker compose up -d --build`.
+```bash
+cd backend
+DATABASE_URL="<supabase-connection-string>" npm run embeddings
+```
 
-## Part B — Frontend on Vercel
+> Supabase connection strings are usually **pooled** (`:6543`) — use the
+> **direct** connection (`:5432`) for one-shot loaders/`psql`, and the pooled
+> one for the app if needed. TLS is required; both tools use it.
 
-1. Push the repo to GitHub (done).
-2. In Vercel: **Add New Project** → import the repo → **Root Directory: `frontend`**.
-   - Framework auto-detected: **Vite**.
-3. Set the env var for the build:
-   - `VITE_API_URL` = `https://api.<domain>` (the Caddy API URL)
-4. Deploy. Every push to `main` (frontend changes) auto-deploys; PRs get preview URLs.
+## 5. Day-2 notes
 
-> The frontend build needs the API URL at **build time** (`import.meta.env.VITE_API_URL`).
-> If you ever want a runtime override, the client also reads `window.__FLICKFINDR_API__`.
-
-## Day-2 notes
-
-- **Backups:** `pg_dump` the `pgdata` volume regularly; S3 parquet files remain the archival source of truth.
-- **Model:** set `PI_MODEL` in `deploy/.env` to your sub's cheapest model; restart backend.
-- **Region/CORS:** if you add a custom domain on Vercel, append it to `CORS_ORIGINS` in `deploy/.env` and redeploy the API.
+- **Cold starts:** keep Render warm with a free pinger, or pay ~$7/mo to
+  disable spin-down (not needed for hobby).
+- **Supabase pause:** free projects pause after 1 week idle; visiting weekly
+  (or a cron hitting a Supabase function) prevents it.
+- **Backups:** Supabase free has no PITR — the S3 parquet files remain your
+  archival source of truth; re-running the load step rebuilds the DB anytime.
+- **Cheapest agent model:** set `PI_MODEL` in Render env to your sub's
+  cheapest model (backend picks first-available when empty).
+- **Scale later:** upgrade Render/Supabase tiers if the app grows; no code
+  changes needed.

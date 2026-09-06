@@ -50,7 +50,12 @@ def _cfg() -> tuple[dict[str, str], str, str]:
     if not all(aws.values()) or not bucket:
         sys.exit("Missing AWS creds / bucket in ../.env (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET_NAME)")
 
-    db_url = os.environ.get("DB_URL", "") or backend_env.get("DB_URL", "")
+    db_url = (
+        os.environ.get("DATABASE_URL", "")
+        or os.environ.get("DB_URL", "")
+        or backend_env.get("DATABASE_URL", "")
+        or backend_env.get("DB_URL", "")
+    )
     if not db_url:
         host = backend_env.get("DB_HOST", "localhost")
         port = backend_env.get("DB_PORT", "5433")

@@ -9,7 +9,7 @@ let pool: pg.Pool | undefined;
 /** Lazily-created pg Pool. Not connected until first query. */
 export function getPool(): pg.Pool {
   if (!pool) {
-    pool = new Pool({ connectionString: config.databaseUrl() });
+    pool = new Pool({ connectionString: config.databaseUrl });
   }
   return pool;
 }

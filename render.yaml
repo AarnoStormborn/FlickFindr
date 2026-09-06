@@ -1,0 +1,38 @@
+# Render blueprint — FlickFindr backend (free web service)
+# Frontend deploys on Vercel; Postgres+pgvector on Supabase.
+#
+# Usage: render.yaml is picked up automatically when you create a "Blueprint"
+# from this repo in Render, or copy the service config manually.
+#
+# Secrets/env to set in Render (Dashboard -> your service -> Environment):
+#   DATABASE_URL      — Supabase connection string (postgres://...)
+#   CORS_ORIGINS      — your Vercel app URL(s)
+#   AGENT_ENABLED     — true/false
+#   PI_MODEL          — optional cheapest model id
+#   TMDB_API_KEY      — optional
+
+services:
+  - type: web
+    name: flickfindr-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/src/index.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000            # Render injects PORT; listen there
+      # These are read from the service's environment (set in dashboard):
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: AGENT_ENABLED
+        sync: false
+      - key: PI_MODEL
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
