@@ -6,6 +6,7 @@ import ViewToggle from '../components/ViewToggle';
 import MetadataForm from '../components/MetadataForm';
 import { hybridSearch, semanticSearch, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
+import useSearchHistory from '../hooks/useSearchHistory';
 import './SearchPage.css';
 
 const TEXT_MODES = ['hybrid', 'semantic'];
@@ -91,6 +92,7 @@ export default function SearchPage() {
     const [meta, setMeta] = useState(null);
     const [searched, setSearched] = useState('');
     const [view, setView] = useViewMode();
+    const { history, recordSearch, clearHistory } = useSearchHistory();
 
     // Monotonic generation: responses from an older mode/search are ignored.
     const generationRef = useRef(0);
@@ -126,6 +128,7 @@ export default function SearchPage() {
                 total: data.total ?? data.results?.length ?? 0,
             });
             setSearched(query.trim());
+            recordSearch(query.trim(), searchMode, new URLSearchParams({ q: query.trim(), mode: searchMode }));
         } catch (err) {
             if (generationRef.current !== gen) return;
             console.error('Search failed:', err);
@@ -135,7 +138,7 @@ export default function SearchPage() {
         } finally {
             if (generationRef.current === gen) setLoading(false);
         }
-    }, []);
+    }, [recordSearch]);
 
     const runStructuralSearch = useCallback(async (filters) => {
         const gen = ++generationRef.current;
@@ -158,7 +161,20 @@ export default function SearchPage() {
             if (generationRef.current !== gen) return;
             setResults(data.results ?? []);
             setMeta({ message: null, exact_matches: null, total: data.total ?? data.results?.length ?? 0 });
-            setSearched(filtersLabel(filters) || 'all movies');
+            const label = filtersLabel(filters) || 'all movies';
+            setSearched(label);
+            // Reproduce this search via its structural URL params.
+            const sp = new URLSearchParams({ mode: 'structural' });
+            if (filters.query) sp.set('title', filters.query);
+            if (filters.genre) sp.set('genre', filters.genre);
+            if (filters.stars) sp.set('actor', filters.stars);
+            if (filters.directors) sp.set('director', filters.directors);
+            if (filters.minYear) sp.set('min_year', filters.minYear);
+            if (filters.maxYear) sp.set('max_year', filters.maxYear);
+            if (filters.minRating) sp.set('min_rating', filters.minRating);
+            if (filters.sortBy !== 'rating') sp.set('sort_by', filters.sortBy);
+            if (filters.sortOrder !== 'desc') sp.set('sort_order', filters.sortOrder);
+            recordSearch(label, 'structural', sp);
         } catch (err) {
             if (generationRef.current !== gen) return;
             console.error('Search failed:', err);
@@ -168,7 +184,7 @@ export default function SearchPage() {
         } finally {
             if (generationRef.current === gen) setLoading(false);
         }
-    }, []);
+    }, [recordSearch]);
 
     const clearResults = useCallback(() => {
         generationRef.current += 1; // invalidate any in-flight search
@@ -331,14 +347,36 @@ export default function SearchPage() {
                     <MovieListTable movies={results} emptyText="No movies matched that search." />
                 ))}
 
-                {!loading && !error && !searched && showSearchBar && (
-                    <div className="search-empty">
-                        <p>Enter a query above — try comparing modes to see the difference.</p>
-                    </div>
-                )}
-                {!loading && !error && !searched && !showSearchBar && (
-                    <div className="search-empty">
-                        <p>Set some fields above, then press Search movies.</p>
+                {!loading && !error && !searched && (
+                    <div className="search-idle">
+                        {history.length > 0 ? (
+                            <>
+                                <div className="history-header">
+                                    <h3 className="history-title">Recent searches</h3>
+                                    <button className="history-clear" onClick={clearHistory} title="Clear history">
+                                        Clear
+                                    </button>
+                                </div>
+                                <div className="history-chips">
+                                    {history.map((entry) => (
+                                        <button
+                                            key={entry.ts + entry.params}
+                                            className="history-chip"
+                                            title={`Search ${entry.mode}`}
+                                            onClick={() => navigate(`/search?${entry.params}`)}
+                                        >
+                                            <span className="history-chip-label">{entry.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        ) : (
+                            <p className="search-idle-hint">
+                                {showSearchBar
+                                    ? 'Enter a query above — or switch modes to search a different way.'
+                                    : 'Set some fields above, then press Search movies.'}
+                            </p>
+                        )}
                     </div>
                 )}
             </section>
