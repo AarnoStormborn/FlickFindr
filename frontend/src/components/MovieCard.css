@@ -85,6 +85,22 @@
     color: var(--text-secondary);
 }
 
+/* Save-to-list floating control (revealed on hover) */
+.movie-card-save {
+    position: absolute;
+    top: 46px;
+    right: 10px;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+    z-index: 30;
+}
+
+.movie-card:hover .movie-card-save {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 /* Hover Overlay */
 .movie-card-overlay {
     position: absolute;

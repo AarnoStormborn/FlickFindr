@@ -23,9 +23,14 @@ export default function Navbar() {
                             Search
                         </NavLink>
                     </li>
+                    <li className="navbar-item">
+                        <NavLink to="/lists" className={activeClass}>
+                            My Lists
+                        </NavLink>
+                    </li>
                 </ul>
 
-                {/* Right Side - Search & Profile */}
+                {/* Right Side - Search button (icon) */}
                 <div className="navbar-actions">
                     <NavLink to="/search" className="navbar-search-btn" aria-label="Search">
                         <svg
@@ -40,9 +45,6 @@ export default function Navbar() {
                             <path d="m21 21-4.35-4.35" />
                         </svg>
                     </NavLink>
-                    <div className="navbar-profile">
-                        <span className="profile-avatar">👤</span>
-                    </div>
                 </div>
             </div>
         </nav>

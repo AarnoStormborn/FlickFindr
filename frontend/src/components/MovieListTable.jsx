@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import AddToListButton from './AddToListButton';
+import { useListsContext } from '../context/useListsContext';
 import './MovieListTable.css';
 
 const FALLBACK_POSTER = 'https://via.placeholder.com/100x150?text=No+Poster';
@@ -21,6 +23,7 @@ function primaryGenre(genre) {
  */
 export default function MovieListTable({ movies, emptyText = 'No movies found' }) {
     const navigate = useNavigate();
+    const listsApi = useListsContext();
 
     if (!movies || movies.length === 0) {
         return (
@@ -40,6 +43,7 @@ export default function MovieListTable({ movies, emptyText = 'No movies found' }
                 <span className="col-runtime">Runtime</span>
                 <span className="col-genre">Genre</span>
                 <span className="col-director">Directors</span>
+                <span className="col-save" />
             </div>
             {movies.map((movie) => {
                 const runtime = formatRuntime(movie.runtime);
@@ -85,6 +89,18 @@ export default function MovieListTable({ movies, emptyText = 'No movies found' }
                             {genre ? <span className="movie-list-genre">{genre}</span> : '—'}
                         </span>
                         <span className="col-director movie-list-directors">{movie.directors || '—'}</span>
+                        {listsApi && (
+                            <span className="col-save" onClick={(e) => e.stopPropagation()}>
+                                <AddToListButton
+                                    movie={movie}
+                                    lists={listsApi.lists}
+                                    toggleList={listsApi.toggleMovieInList}
+                                    createAndSave={listsApi.createListAndSave}
+                                    isSaved={listsApi.isSaved}
+                                    variant="icon"
+                                />
+                            </span>
+                        )}
                     </div>
                 );
             })}

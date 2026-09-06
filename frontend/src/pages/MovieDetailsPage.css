@@ -221,6 +221,16 @@
     margin-bottom: var(--space-lg);
 }
 
+/* Actions (save to list) */
+.movie-actions {
+    margin-bottom: var(--space-lg);
+}
+
+.movie-actions .add-to-list-menu {
+    right: auto;
+    left: 0;
+}
+
 .genre-tag {
     padding: var(--space-xs) var(--space-md);
     background: rgba(255, 255, 255, 0.1);

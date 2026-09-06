@@ -17,11 +17,11 @@
     overflow: hidden;
 }
 
-/* Shared column grid: thumb | title | year | rating | runtime | genre | director */
+/* Shared column grid: thumb | title | year | rating | runtime | genre | director | save */
 .movie-list-head,
 .movie-list-row {
     display: grid;
-    grid-template-columns: 56px minmax(180px, 2.2fr) 64px 84px 92px minmax(110px, 1.2fr) minmax(140px, 1.6fr);
+    grid-template-columns: 56px minmax(180px, 2.2fr) 64px 84px 92px minmax(110px, 1.2fr) minmax(140px, 1.6fr) 40px;
     align-items: center;
     gap: var(--space-sm);
     padding: var(--space-sm) var(--space-lg);
@@ -100,7 +100,7 @@
 @media (max-width: 900px) {
     .movie-list-head,
     .movie-list-row {
-        grid-template-columns: 56px minmax(150px, 1fr) 64px 84px;
+        grid-template-columns: 56px minmax(150px, 1fr) 64px 84px 40px;
     }
     .col-runtime,
     .col-genre,

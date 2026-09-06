@@ -1,8 +1,11 @@
 import { useNavigate } from 'react-router-dom';
+import AddToListButton from './AddToListButton';
+import { useListsContext } from '../context/useListsContext';
 import './MovieCard.css';
 
 export default function MovieCard({ movie }) {
     const navigate = useNavigate();
+    const listsApi = useListsContext();
     const {
         id,
         movie_name,
@@ -51,6 +54,20 @@ export default function MovieCard({ movie }) {
                 {/* Release Year Badge */}
                 {movie.release_year && (
                     <div className="movie-card-year">{movie.release_year}</div>
+                )}
+
+                {/* Save-to-list (icon) — uses app-level lists store */}
+                {listsApi && (
+                    <div className="movie-card-save">
+                        <AddToListButton
+                            movie={movie}
+                            lists={listsApi.lists}
+                            toggleList={listsApi.toggleMovieInList}
+                            createAndSave={listsApi.createListAndSave}
+                            isSaved={listsApi.isSaved}
+                            variant="icon"
+                        />
+                    </div>
                 )}
 
                 {/* Hover Overlay */}

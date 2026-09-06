@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getMovieById } from '../api/movies';
+import AddToListButton from '../components/AddToListButton';
+import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
 
 export default function MovieDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const listsApi = useListsContext();
     const [movie, setMovie] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -129,6 +132,20 @@ export default function MovieDetailsPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Actions: save to list */}
+                        {listsApi && movie && (
+                            <div className="movie-actions">
+                                <AddToListButton
+                                    movie={movie}
+                                    lists={listsApi.lists}
+                                    toggleList={listsApi.toggleMovieInList}
+                                    createAndSave={listsApi.createListAndSave}
+                                    isSaved={listsApi.isSaved}
+                                    variant="plain"
+                                />
+                            </div>
+                        )}
 
                         {/* Genres */}
                         {movie.genre && (

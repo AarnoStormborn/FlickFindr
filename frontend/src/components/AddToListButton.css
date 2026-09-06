@@ -1,0 +1,168 @@
+/* ========================================
+   Add To List - dropdown menu
+   ======================================== */
+
+.add-to-list {
+    position: relative;
+    display: inline-flex;
+}
+
+.add-to-list-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line-subtle);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.add-to-list-trigger:hover {
+    color: var(--text-primary);
+    border-color: var(--line-subtle);
+    background: var(--bg-hover);
+}
+
+.add-to-list-trigger.saved {
+    color: var(--accent-gold);
+    border-color: rgba(217, 164, 65, 0.45);
+    background: rgba(217, 164, 65, 0.1);
+}
+
+.add-to-list-trigger.icon {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(10, 10, 12, 0.7);
+    backdrop-filter: blur(6px);
+}
+
+/* Menu */
+.add-to-list-menu {
+    position: absolute;
+    z-index: 300;
+    min-width: 210px;
+    max-width: 260px;
+    margin-top: 8px;
+    padding: var(--space-sm);
+    background: linear-gradient(180deg, #1c1c24, #141419);
+    border: 1px solid var(--line-subtle);
+    border-radius: 12px;
+    box-shadow: var(--shadow-floating);
+    font-size: 0.85rem;
+    text-align: left;
+}
+
+/* positioned right-aligned by default (cards/rows), override per context */
+.add-to-list-menu {
+    right: 0;
+}
+
+.add-to-list-title {
+    padding: 2px 6px 8px;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--line-faint);
+    margin-bottom: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.add-to-list-items {
+    display: flex;
+    flex-direction: column;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.add-to-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: 7px 8px;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.add-to-list-item:hover {
+    background: var(--bg-hover);
+}
+
+.add-to-list-item-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.add-to-list-check {
+    color: var(--accent-gold);
+    flex-shrink: 0;
+}
+
+.add-to-list-empty {
+    padding: 6px 8px;
+    color: var(--text-muted);
+}
+
+.add-to-list-new {
+    width: 100%;
+    margin-top: 6px;
+    padding: 7px 8px;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--line-faint);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.add-to-list-new:hover {
+    color: var(--accent-gold);
+}
+
+.add-to-list-create {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line-faint);
+}
+
+.add-to-list-create input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--line-subtle);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+
+.add-to-list-create button {
+    padding: 5px 10px;
+    background: var(--accent-gradient);
+    border: none;
+    border-radius: 6px;
+    color: #16130c;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
