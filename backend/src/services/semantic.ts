@@ -15,14 +15,27 @@ function toSemanticResult(row: Record<string, unknown>): MovieResult {
   return movie;
 }
 
-function categorize(movies: MovieResult[], hasFilters: boolean): { exact_matches: boolean; message: string } {
+function categorize(
+  movies: MovieResult[],
+  hasFilters: boolean,
+  kind: "semantic" | "hybrid",
+): { exact_matches: boolean; message: string } {
   const exact_matches = movies.some(
     (m) => m.similarity_score !== null && m.similarity_score !== undefined && m.similarity_score >= SIMILARITY_THRESHOLD,
   );
   let message: string;
-  if (exact_matches) message = "Movies found matching your query";
-  else if (movies.length > 0) message = hasFilters ? "No exact matches found, but here are some similar movies" : "No exact matches found, but here are some similar movies";
-  else message = hasFilters ? "No movies found matching your criteria" : "No movies found";
+  if (exact_matches) {
+    message = "Movies found matching your query";
+  } else if (movies.length > 0) {
+    // Hybrid is always a fuzzy/ranked search — never frame it as "no exact
+    // match". Semantic keeps the helpful similar-movies caveat.
+    message =
+      kind === "hybrid"
+        ? "Here are some movies we think you'll like"
+        : "No exact matches found, but here are some similar movies";
+  } else {
+    message = hasFilters ? "No movies found matching your criteria" : "No movies found";
+  }
   return { exact_matches, message };
 }
 
@@ -46,7 +59,7 @@ export const semanticService = {
       );
 
       const movies = rows.map(toSemanticResult);
-      const { exact_matches, message } = categorize(movies, false);
+      const { exact_matches, message } = categorize(movies, false, "semantic");
       logger.info({ len: movies.length, exact_matches, query: req.query.slice(0, 50) }, "Semantic search executed");
       return { movies, exact_matches, message };
     } catch (err) {
@@ -106,7 +119,7 @@ export const semanticService = {
       const movies = relaxed ? relaxed.movies : strict.movies;
       const usedFilters = relaxed ? relaxed.usedFilters : strict.usedFilters;
 
-      const { exact_matches, message } = categorize(movies, usedFilters);
+      const { exact_matches, message } = categorize(movies, usedFilters, "hybrid");
       logger.info(
         { len: movies.length, exact_matches, relaxed: Boolean(req.genre || req.directors || req.stars) && strict.movies.length === 0 && movies.length > 0, query: req.query.slice(0, 50) },
         "Hybrid search executed",
