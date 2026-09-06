@@ -32,6 +32,7 @@ export type StructuralSearchRequest = z.infer<typeof StructuralSearchRequestSche
 
 export const SemanticSearchRequestSchema = z.object({
   query: z.string().min(3),
+  skip: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(100).default(10),
 });
 export type SemanticSearchRequest = z.infer<typeof SemanticSearchRequestSchema>;
@@ -45,6 +46,7 @@ export const HybridSearchRequestSchema = z.object({
   max_rating: z.number().min(0).max(10).optional(),
   min_runtime: z.number().int().min(0).optional(),
   max_runtime: z.number().int().min(0).optional(),
+  skip: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(100).default(10),
 });
 export type HybridSearchRequest = z.infer<typeof HybridSearchRequestSchema>;
@@ -82,7 +84,10 @@ export interface SearchResponse {
 export interface SemanticSearchResponse {
   results: MovieResult[];
   query: string;
+  skip: number;
   limit: number;
+  total: number;
+  has_more: boolean;
   exact_matches: boolean;
   message: string;
 }

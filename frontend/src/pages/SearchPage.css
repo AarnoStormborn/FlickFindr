@@ -300,3 +300,32 @@
     color: var(--accent-blue);
     font-size: var(--font-size-sm);
 }
+
+/* Show more */
+.search-more-row {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--space-xl);
+}
+
+.search-more-btn {
+    padding: var(--space-sm) var(--space-xl);
+    background: rgba(217, 164, 65, 0.1);
+    border: 1px solid rgba(217, 164, 65, 0.4);
+    border-radius: 999px;
+    color: var(--accent-gold);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.search-more-btn:hover:not(:disabled) {
+    background: var(--accent-gold);
+    color: #16130c;
+}
+
+.search-more-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}

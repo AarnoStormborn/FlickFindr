@@ -137,12 +137,12 @@ export async function getMovieById(id) {
 /**
  * Semantic search using natural language
  */
-export async function semanticSearch(query, limit = 10) {
-    return cachedFetch(keyOf(['semantic', query.trim(), limit]), () =>
+export async function semanticSearch(query, limit = 20, skip = 0) {
+    return cachedFetch(keyOf(['semantic', query.trim(), limit, skip]), () =>
         fetchJson(`${API_BASE_URL}/search/semantic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: query.trim(), limit }),
+            body: JSON.stringify({ query: query.trim(), limit, skip }),
         }).then((d) => {
             if (!Array.isArray(d.results)) throw new Error('Semantic search failed');
             return d;
@@ -163,7 +163,8 @@ export async function hybridSearch(params) {
     if (params.maxRating != null) body.max_rating = params.maxRating;
     if (params.minRuntime != null) body.min_runtime = params.minRuntime;
     if (params.maxRuntime != null) body.max_runtime = params.maxRuntime;
-    body.limit = params.limit || 10;
+    body.limit = params.limit || 20;
+    if (params.skip != null) body.skip = params.skip;
 
     return cachedFetch(keyOf(['hybrid', body]), () =>
         fetchJson(`${API_BASE_URL}/search/hybrid`, {

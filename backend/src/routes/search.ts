@@ -72,15 +72,18 @@ export function searchRoutes(app: FastifyInstance, deps: SearchDeps): void {
       // Agent interprets the query; embedding search runs on the interpreted intent.
       const interpreted = await agentParse(parsed.data.query);
       const query = interpreted.query.trim() ? interpreted.query : parsed.data.query;
-      const { movies, exact_matches, message } = await semanticService.semanticSearch(
+      const { movies, total, exact_matches, message } = await semanticService.semanticSearch(
         db,
-        { query, limit: parsed.data.limit },
+        { query, limit: parsed.data.limit, skip: parsed.data.skip },
         embed,
       );
       const body: SemanticSearchResponse = {
         results: movies,
         query: parsed.data.query,
+        skip: parsed.data.skip,
         limit: parsed.data.limit,
+        total,
+        has_more: parsed.data.skip + movies.length < total,
         exact_matches,
         message,
       };
@@ -102,6 +105,7 @@ export function searchRoutes(app: FastifyInstance, deps: SearchDeps): void {
       const merged: HybridSearchRequest = {
         query: enriched.query.trim() ? enriched.query : parsed.data.query,
         limit: parsed.data.limit,
+        skip: parsed.data.skip,
         genre: enriched.genre ?? parsed.data.genre,
         directors: enriched.directors ?? parsed.data.directors,
         stars: enriched.stars ?? parsed.data.stars,
@@ -110,11 +114,14 @@ export function searchRoutes(app: FastifyInstance, deps: SearchDeps): void {
         min_runtime: enriched.min_runtime ?? parsed.data.min_runtime,
         max_runtime: enriched.max_runtime ?? parsed.data.max_runtime,
       };
-      const { movies, exact_matches, message } = await semanticService.hybridSearch(db, merged, embed);
+      const { movies, total, exact_matches, message } = await semanticService.hybridSearch(db, merged, embed);
       const body: SemanticSearchResponse = {
         results: movies,
         query: parsed.data.query,
+        skip: parsed.data.skip,
         limit: parsed.data.limit,
+        total,
+        has_more: parsed.data.skip + movies.length < total,
         exact_matches,
         message,
       };

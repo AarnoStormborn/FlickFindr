@@ -87,12 +87,17 @@ export default function SearchPage() {
 
     const [input, setInput] = useState(queryFromUrl);
     const [loading, setLoading] = useState(false);
+    const [moreLoading, setMoreLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
     const [error, setError] = useState(null);
     const [results, setResults] = useState([]);
     const [meta, setMeta] = useState(null);
     const [searched, setSearched] = useState('');
     const [view, setView] = useViewMode();
     const { history, recordSearch, clearHistory } = useSearchHistory();
+    const activeSearchRef = useRef(null); // descriptor for load-more
+
+    const PAGE_SIZE = 30;
 
     // Monotonic generation: responses from an older mode/search are ignored.
     const generationRef = useRef(0);
@@ -112,22 +117,24 @@ export default function SearchPage() {
             let data;
             let message = null;
             if (searchMode === 'semantic') {
-                data = await semanticSearch(query.trim(), 20);
+                data = await semanticSearch(query.trim(), PAGE_SIZE);
                 message = data.message;
             } else if (searchMode === 'structural') {
-                data = await searchMovies({ query: query.trim(), limit: 20, sortBy: 'rating', sortOrder: 'desc' });
+                data = await searchMovies({ query: query.trim(), limit: PAGE_SIZE, sortBy: 'rating', sortOrder: 'desc' });
             } else {
-                data = await hybridSearch({ query: query.trim(), limit: 20 });
+                data = await hybridSearch({ query: query.trim(), limit: PAGE_SIZE });
                 message = data.message;
             }
             if (generationRef.current !== gen) return; // stale — a newer search started
             setResults(data.results ?? []);
+            setHasMore(!!data.has_more);
             setMeta({
                 message,
                 exact_matches: data.exact_matches ?? null,
                 total: data.total ?? data.results?.length ?? 0,
             });
             setSearched(query.trim());
+            activeSearchRef.current = { kind: 'text', query: query.trim(), searchMode, gen };
             recordSearch(query.trim(), searchMode, new URLSearchParams({ q: query.trim(), mode: searchMode }));
         } catch (err) {
             if (generationRef.current !== gen) return;
@@ -146,7 +153,7 @@ export default function SearchPage() {
         setError(null);
         try {
             const params = {
-                limit: 30,
+                limit: PAGE_SIZE,
                 sortBy: filters.sortBy,
                 sortOrder: filters.sortOrder,
             };
@@ -160,9 +167,11 @@ export default function SearchPage() {
             const data = await searchMovies(params);
             if (generationRef.current !== gen) return;
             setResults(data.results ?? []);
+            setHasMore(!!data.has_more);
             setMeta({ message: null, exact_matches: null, total: data.total ?? data.results?.length ?? 0 });
             const label = filtersLabel(filters) || 'all movies';
             setSearched(label);
+            activeSearchRef.current = { kind: 'structural', filters, gen };
             // Reproduce this search via its structural URL params.
             const sp = new URLSearchParams({ mode: 'structural' });
             if (filters.query) sp.set('title', filters.query);
@@ -189,11 +198,61 @@ export default function SearchPage() {
     const clearResults = useCallback(() => {
         generationRef.current += 1; // invalidate any in-flight search
         setLoading(false);
+        setMoreLoading(false);
+        setHasMore(false);
         setError(null);
         setResults([]);
         setMeta(null);
         setSearched('');
+        activeSearchRef.current = null;
     }, []);
+
+    // Append the next page of results for the active search (Show more).
+    const fetchMore = useCallback(async () => {
+        const active = activeSearchRef.current;
+        if (!active || moreLoading) return;
+        setMoreLoading(true);
+        setError(null);
+        try {
+            const skip = results.length;
+            let data;
+            let message = null;
+            if (active.kind === 'structural') {
+                data = await searchMovies({
+                    ...active.filters,
+                    skip,
+                    limit: PAGE_SIZE,
+                    sortBy: active.filters.sortBy,
+                    sortOrder: active.filters.sortOrder,
+                });
+            } else if (active.searchMode === 'semantic') {
+                data = await semanticSearch(active.query, PAGE_SIZE, skip);
+                message = data.message;
+            } else if (active.searchMode === 'hybrid') {
+                data = await hybridSearch({ query: active.query, limit: PAGE_SIZE, skip });
+                message = data.message;
+            } else {
+                data = await searchMovies({ query: active.query, limit: PAGE_SIZE, skip, sortBy: 'rating', sortOrder: 'desc' });
+            }
+            setResults((prev) => {
+                if (activeSearchRef.current !== active) return prev; // search changed mid-flight
+                const seen = new Set(prev.map((m) => m.id));
+                const fresh = (data.results ?? []).filter((m) => !seen.has(m.id));
+                return [...prev, ...fresh];
+            });
+            setHasMore(!!data.has_more);
+            setMeta((prevMeta) => ({
+                ...(prevMeta ?? {}),
+                message: message ?? prevMeta?.message ?? null,
+                total: data.total ?? prevMeta?.total ?? 0,
+            }));
+        } catch (err) {
+            console.error('Load more failed:', err);
+            setError(err.message || 'Failed to load more results');
+        } finally {
+            setMoreLoading(false);
+        }
+    }, [moreLoading, results.length]);
 
     // Drive searches purely from URL changes (navigation, back/forward, mode chip).
     useEffect(() => {
@@ -346,6 +405,14 @@ export default function SearchPage() {
                 ) : (
                     <MovieListTable movies={results} emptyText="No movies matched that search." />
                 ))}
+
+                {!loading && !error && results.length > 0 && hasMore && (
+                    <div className="search-more-row">
+                        <button className="search-more-btn" onClick={fetchMore} disabled={moreLoading}>
+                            {moreLoading ? 'Loading…' : `Show more (${(meta?.total ?? 0) - results.length} more)`}
+                        </button>
+                    </div>
+                )}
 
                 {!loading && !error && !searched && (
                     <div className="search-idle">

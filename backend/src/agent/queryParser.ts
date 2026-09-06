@@ -9,6 +9,10 @@ import { logger } from "../logger.js";
 import { HybridSearchRequestSchema, type HybridSearchRequest } from "../models.js";
 import { getModelRuntime } from "./runtime.js";
 
+// In-memory agent-parse cache: repeat searches / pagination reuse intent.
+const PARSE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
+const parseCache = new Map<string, { value: HybridSearchRequest; ts: number }>();
+
 const PARSE_PROMPT = `You are a movie-catalog query parser. Convert the user's natural-language
 movie search request into a single JSON object with ONLY these fields (omit any that are unknown):
 
@@ -90,9 +94,29 @@ async function minimalLoader(): Promise<DefaultResourceLoader> {
 /**
  * Run a Pi agent to parse a natural-language query into a structured
  * HybridSearchRequest. Falls back to { query } on agent failure.
+ * Results are cached per query (in-memory, short TTL) so repeat searches
+ * and pagination don't re-invoke the model for identical intent.
  */
 export async function parseSearchQuery(rawQuery: string): Promise<HybridSearchRequest> {
-  const fallback: HybridSearchRequest = { query: rawQuery, limit: 10 };
+  const key = rawQuery.trim().toLowerCase();
+  const hit = parseCache.get(key);
+  if (hit && Date.now() - hit.ts < PARSE_CACHE_TTL_MS) {
+    return hit.value;
+  }
+  const result = await parseSearchQueryImpl(rawQuery);
+  // only cache successful (non-fallback, parsed) results
+  if (result.query.trim() && result.query !== rawQuery.trim()) {
+    parseCache.set(key, { value: result, ts: Date.now() });
+    if (parseCache.size > 200) {
+      const oldest = parseCache.keys().next().value;
+      if (oldest !== undefined) parseCache.delete(oldest);
+    }
+  }
+  return result;
+}
+
+async function parseSearchQueryImpl(rawQuery: string): Promise<HybridSearchRequest> {
+  const fallback: HybridSearchRequest = { query: rawQuery, skip: 0, limit: 10 };
   if (!config.agent.enabled || !rawQuery.trim()) return fallback;
 
   let session: Awaited<ReturnType<typeof createAgentSession>> | undefined;

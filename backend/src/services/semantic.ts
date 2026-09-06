@@ -44,24 +44,29 @@ export const semanticService = {
    * Semantic search: embed the query, then rank rows by cosine similarity
    * to the query embedding using the pgvector `<=>` operator.
    */
-  async semanticSearch(db: Queryable, req: SemanticSearchRequest, getEmbedding: (text: string) => Promise<number[]>): Promise<{ movies: MovieResult[]; exact_matches: boolean; message: string }> {
+  async semanticSearch(db: Queryable, req: { query: string; limit: number; skip?: number }, getEmbedding: (text: string) => Promise<number[]>): Promise<{ movies: MovieResult[]; total: number; exact_matches: boolean; message: string }> {
     try {
       const embedding = await getEmbedding(req.query);
       const vec = `[${embedding.join(",")}]`;
+      const skip = req.skip ?? 0;
 
       const { rows } = await db.query(
         `SELECT ${SIMILARITY_SELECT}
          FROM movies
          WHERE plot_embedding IS NOT NULL
          ORDER BY plot_embedding <=> CAST($1 AS vector)
-         LIMIT $2`,
-        [vec, req.limit],
+         LIMIT $2 OFFSET $3`,
+        [vec, req.limit, skip],
+      );
+      const { rows: countRows } = await db.query(
+        "SELECT count(*)::int AS total FROM movies WHERE plot_embedding IS NOT NULL",
       );
 
       const movies = rows.map(toSemanticResult);
+      const total = Number(countRows[0]?.total ?? movies.length);
       const { exact_matches, message } = categorize(movies, false, "semantic");
-      logger.info({ len: movies.length, exact_matches, query: req.query.slice(0, 50) }, "Semantic search executed");
-      return { movies, exact_matches, message };
+      logger.info({ len: movies.length, total, exact_matches, query: req.query.slice(0, 50) }, "Semantic search executed");
+      return { movies, total, exact_matches, message };
     } catch (err) {
       logger.error({ err }, "Semantic search failed");
       throw err;
@@ -76,40 +81,55 @@ export const semanticService = {
    */
   async hybridSearch(
     db: Queryable,
-    req: { query: string; limit: number; genre?: string; directors?: string; stars?: string; min_rating?: number; max_rating?: number; min_runtime?: number; max_runtime?: number },
+    req: { query: string; limit: number; skip?: number; genre?: string; directors?: string; stars?: string; min_rating?: number; max_rating?: number; min_runtime?: number; max_runtime?: number },
     getEmbedding: (text: string) => Promise<number[]>,
-  ): Promise<{ movies: MovieResult[]; exact_matches: boolean; message: string }> {
+  ): Promise<{ movies: MovieResult[]; total: number; exact_matches: boolean; message: string }> {
     try {
       const embedding = await getEmbedding(req.query);
       const vec = `[${embedding.join(",")}]`;
+      const skip = req.skip ?? 0;
 
-      const run = async (useCategorical: boolean): Promise<{ movies: MovieResult[]; usedFilters: boolean }> => {
-        const where: string[] = ["plot_embedding IS NOT NULL"];
-        const params: unknown[] = [vec];
-        const addFilter = (column: string, value: unknown, op = "ILIKE", pattern = false) => {
+      const run = async (useCategorical: boolean): Promise<{ movies: MovieResult[]; total: number; usedFilters: boolean }> => {
+        // conditions are built for the DATA query where $1 = the vector;
+        // base starts at 1. The COUNT query re-binds the same filter values
+        // starting at $1 (no vector) via bindFilterSql().
+        const vec = `[${embedding.join(",")}]`;
+        const condsData: string[] = []; // numbered from $2 (data query, $1 = vec)
+        const condsCount: string[] = []; // numbered from $1 (count query)
+        const filterValues: unknown[] = [];
+        const addCond = (column: string, value: unknown, op = "ILIKE", pattern = false) => {
           if (value === undefined || value === null) return;
-          params.push(pattern ? `%${value}%` : value);
-          where.push(`${column} ${op} $${params.length}`);
+          filterValues.push(pattern ? `%${value}%` : value);
+          condsData.push(`${column} ${op} $${filterValues.length + 1}`);
+          condsCount.push(`${column} ${op} $${filterValues.length}`);
         };
         if (useCategorical) {
-          addFilter("genre", req.genre, "ILIKE", true);
-          addFilter("directors", req.directors, "ILIKE", true);
-          addFilter("stars", req.stars, "ILIKE", true);
+          addCond("genre", req.genre, "ILIKE", true);
+          addCond("directors", req.directors, "ILIKE", true);
+          addCond("stars", req.stars, "ILIKE", true);
         }
-        addFilter("rating", req.min_rating, ">=");
-        addFilter("rating", req.max_rating, "<=");
-        addFilter("runtime", req.min_runtime, ">=");
-        addFilter("runtime", req.max_runtime, "<=");
+        addCond("rating", req.min_rating, ">=");
+        addCond("rating", req.max_rating, "<=");
+        addCond("runtime", req.min_runtime, ">=");
+        addCond("runtime", req.max_runtime, "<=");
 
-        params.push(req.limit);
+        const whereSql = `plot_embedding IS NOT NULL${condsData.length ? ` AND ${condsData.join(" AND ")}` : ""}`;
+        // COUNT query: same filters numbered from $1 (no vector involved).
+        const countSql = condsCount.length
+          ? `SELECT count(*)::int AS total FROM movies WHERE ${condsCount.join(" AND ")}`
+          : "SELECT count(*)::int AS total FROM movies WHERE plot_embedding IS NOT NULL";
+        const { rows: countRows } = await db.query(countSql, filterValues);
+        const total = Number(countRows[0]?.total ?? 0);
+
         const sql = `SELECT ${SIMILARITY_SELECT}
           FROM movies
-          WHERE ${where.join(" AND ")}
+          WHERE ${whereSql}
           ORDER BY plot_embedding <=> CAST($1 AS vector)
-          LIMIT $${params.length}`;
+          LIMIT $${filterValues.length + 2} OFFSET $${filterValues.length + 3}`;
+        const dataParams = [vec, ...filterValues, req.limit, skip];
 
-        const { rows } = await db.query(sql, params);
-        return { movies: rows.map(toSemanticResult), usedFilters: where.length > 1 };
+        const { rows } = await db.query(sql, dataParams);
+        return { movies: rows.map(toSemanticResult), total, usedFilters: condsData.length > 0 };
       };
 
       const strict = await run(true);
@@ -117,14 +137,15 @@ export const semanticService = {
       const relaxed =
         anyCategorical && strict.movies.length === 0 ? await run(false) : undefined;
       const movies = relaxed ? relaxed.movies : strict.movies;
+      const total = relaxed ? relaxed.total : strict.total;
       const usedFilters = relaxed ? relaxed.usedFilters : strict.usedFilters;
 
       const { exact_matches, message } = categorize(movies, usedFilters, "hybrid");
       logger.info(
-        { len: movies.length, exact_matches, relaxed: Boolean(req.genre || req.directors || req.stars) && strict.movies.length === 0 && movies.length > 0, query: req.query.slice(0, 50) },
+        { len: movies.length, total, exact_matches, relaxed: Boolean(req.genre || req.directors || req.stars) && strict.movies.length === 0 && movies.length > 0, query: req.query.slice(0, 50) },
         "Hybrid search executed",
       );
-      return { movies, exact_matches, message };
+      return { movies, total, exact_matches, message };
     } catch (err) {
       logger.error({ err }, "Hybrid search failed");
       throw err;
