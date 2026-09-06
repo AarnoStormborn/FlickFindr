@@ -4,9 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - 'deploy/**'
+      - 'backend/**'          # API code → rebuild backend on VPS
+      - 'deploy/**'           # compose/caddy/env changes
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 

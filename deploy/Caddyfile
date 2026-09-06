@@ -1,33 +1,15 @@
-# FlickFindr production Caddy config.
-# Placeholder domain — replace {APP_DOMAIN} with your real domain (or use a
-# localhost/testing block). Caddy auto-provisions Let's Encrypt TLS.
-{$APP_DOMAIN} {
-	# API routes -> backend (Fastify on :8000 inside the network)
-	handle /search/* {
-		reverse_proxy backend:8000
-	}
-	handle /flicks/* {
-		reverse_proxy backend:8000
-	}
-	handle /flicks {
-		reverse_proxy backend:8000
-	}
-	handle /chat {
-		reverse_proxy backend:8000
-	}
-	handle /config.js {
-		reverse_proxy frontend:80
-	}
-
-	# Everything else -> frontend static (nginx)
+# FlickFindr production Caddy config — API host only.
+# Frontend is served by Vercel; this Caddy instance fronts the backend API.
+# {$API_DOMAIN} is the API's public domain (e.g. api.flickfindr.example.com).
+{$API_DOMAIN} {
+	# All API traffic -> backend (Fastify on :8000 inside the network)
 	handle {
-		reverse_proxy frontend:80
+		reverse_proxy backend:8000
 	}
 
 	# Reasonable security headers (hobby-grade)
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy no-referrer
-		X-Frame-Options SAMEORIGIN
 	}
 }

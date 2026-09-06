@@ -42,23 +42,14 @@ services:
       REDIS_URL: redis://redis:6379
       PORT: 8000
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      CORS_ORIGINS: ${APP_URL:-http://localhost}
+      # Browser origin(s) allowed to call this API (Vercel app URL, etc.)
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       AGENT_ENABLED: ${AGENT_ENABLED:-true}
       PI_MODEL: ${PI_MODEL:-}
       AGENT_QUERY_TIMEOUT_MS: ${AGENT_QUERY_TIMEOUT_MS:-30000}
       TMDB_API_KEY: ${TMDB_API_KEY:-}
     volumes:
       - hfcache:/app/.cache   # huggingface model cache (persist across restarts)
-    networks: [internal]
-
-  frontend:
-    build:
-      context: ../frontend
-    restart: unless-stopped
-    environment:
-      API_BASE_URL: ""   # same-origin via Caddy proxy
-    depends_on:
-      - backend
     networks: [internal]
 
   caddy:
@@ -69,13 +60,12 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - frontend
       - backend
     networks: [internal]
 

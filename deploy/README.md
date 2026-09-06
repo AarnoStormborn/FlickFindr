@@ -1,103 +1,100 @@
-# FlickFindr V1 — Deployment Guide (single $0 VPS)
+# FlickFindr V1 — Deployment Guide (hybrid: Vercel + single $0 VPS)
 
-One always-on box runs the whole stack with Docker Compose + Caddy (auto-HTTPS).
-Target: Oracle Cloud **Always Free** ARM VM (~$0/mo). Everything is hobby-grade.
+**Frontend** → Vercel (free tier: CDN, auto previews per PR, no server to run).
+**Backend + Postgres + Redis** → one always-on Oracle **Always Free** ARM VM.
+The Vercel app calls the API over HTTPS (Caddy auto-TLS on the VPS).
 
 ```
-Internet -> Caddy (:80/:443, auto TLS)
-              ├── frontend (nginx static)
-              └── /search/* /flicks/* /chat /config.js -> backend (Fastify :8000)
-backend -> postgres (pgvector) + redis (both private network)
+Browser
+  ├── https://<vercel-app>.vercel.app  -> Vercel (React static)
+  └── API calls (VITE_API_URL)  ->  https://api.<domain>  -> Caddy -> backend:8000
+VPS (docker compose): postgres(pgvector) + redis + backend + caddy
 ```
 
-## 1. Create the VPS (Oracle Always Free)
+## Part A — Backend on the VPS
 
-1. Sign up at cloud.oracle.com (needs a card for identity; ARM free tier does not bill).
-2. Create a **VM.Standard.A1.Flex** instance: 4 OCPU / 24 GB RAM, Ubuntu 22.04/24.04 (or Debian).
+### 1. Create the VM (Oracle Always Free)
+
+1. Sign up at cloud.oracle.com (card for identity; ARM free tier doesn't bill).
+2. Create a **VM.Standard.A1.Flex**: 4 OCPU / 24 GB RAM, Ubuntu 22.04/24.04.
    - Add your **SSH public key** during creation.
-3. In VCN security list, open **80/tcp** and **443/tcp** (SSH 22 is default-open).
-4. Optionally give the instance a **public IP reservation** (static).
+3. In the VCN security list open **80/tcp** and **443/tcp**.
+4. Reserve a static **public IP** (optional but recommended).
 
-> If Oracle signup is painful, a Hetzner CX22 (~€4/mo) works identically.
+> If Oracle signup is painful, Hetzner CX22 (~€4/mo) works identically.
 
-## 2. One-time box setup
+### 2. One-time box setup
 
 ```bash
 ssh ubuntu@<VPS_IP>
-
-# Docker + compose plugin
 curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER   # then re-login
-docker compose version          # sanity
+sudo usermod -aG docker $USER          # re-login after
+docker compose version
 
-# Project checkout (used by CI deploys)
 sudo mkdir -p /opt/flickfindr && sudo chown $USER:$USER /opt/flickfindr
 cd /opt/flickfindr
-git clone git@github.com:<you>/FlickFindr.git .   # or https clone
+git clone <repo> .
 ```
 
-## 3. Environment (once)
+### 3. Environment (once)
 
 ```bash
 cd /opt/flickfindr/deploy
 cp .env.prod.example .env
-nano .env    # set: APP_DOMAIN, APP_URL, POSTGRES_PASSWORD, AGENT_ENABLED, PI_MODEL, TMDB_API_KEY
+nano .env    # set: API_DOMAIN, CORS_ORIGINS, POSTGRES_PASSWORD, PI_MODEL, TMDB_API_KEY
 ```
 
 Key vars:
 
 | Var | Notes |
 |---|---|
-| `APP_DOMAIN` | Your real domain, e.g. `flickfindr.example.com` |
+| `API_DOMAIN` | The API host, e.g. `api.flickfindr.example.com` |
+| `CORS_ORIGINS` | Your Vercel app URL(s) — the browser origin(s) allowed to call the API |
 | `POSTGRES_PASSWORD` | Strong random value |
 | `AGENT_ENABLED` | `true` = agent search (small LLM cost/search), `false` = free plain search |
-| `PI_MODEL` | Cheap model id for the agent (e.g. a sub-backed small model). Empty = first available |
-| `CORS_ORIGINS` | Auto-set from `APP_URL` |
+| `PI_MODEL` | Cheap model id for the agent (empty = first available) |
 
-Point your domain's **A record** at the VPS IP (Caddy then gets certs automatically).
+Point `api.<domain>` (an **A record**) at the VPS IP → Caddy issues certs automatically.
 
-## 4. First deploy (manual, then CI takes over)
+### 4. First deploy
 
 ```bash
 cd /opt/flickfindr
 docker compose -f deploy/docker-compose.prod.yml up -d --build
-docker compose -f deploy/docker-compose.prod.yml ps
-curl -s https://$APP_DOMAIN/                # frontend
-curl -s https://$APP_DOMAIN/search/stats    # API (no auth, public — fine for hobby)
+curl -s https://api.<domain>/search/stats     # expect JSON
 ```
 
-The backend container pre-warms the embedding model on first start (downloads
-~90 MB once into the `hfcache` volume), then boots.
+Backend pre-warms the embedding model on first boot (~90 MB into `hfcache`).
 
-## 5. Load the catalog (S3 -> prod Postgres)
-
-Run once from anywhere with AWS creds + network to the box, OR port-forward:
+### 5. Load the catalog (S3 -> prod Postgres)
 
 ```bash
-# from your laptop, forward the prod DB port:
+# from your laptop, tunnel to the box:
 ssh -L 5433:localhost:5433 ubuntu@<VPS_IP>
-# then (tools/load-backend) pointing DB_PORT=5433 at the tunnel:
-DB_PORT=5433 python load.py
+cd tools/load-backend
+DB_PORT=5433 python load.py                 # streams S3 parquet -> prod DB
 ```
 
-(Prod Postgres is only on the internal network — the tunnel keeps it private.)
+### 6. CI deploys (after the box is proven)
 
-## 6. CI deploys (after the box is proven)
+GitHub secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_PORT`, `VPS_SSH_KEY`.
+Push to `main` (when backend/deploy files change) → `.github/workflows/deploy.yml`
+verifies then SSHs in: `git reset --hard`, `docker compose up -d --build`.
 
-Add GitHub repo secrets:
-- `VPS_HOST`, `VPS_USER`, `VPS_SSH_PORT`
-- `VPS_SSH_KEY` — a deploy key for the box (or your personal key)
+## Part B — Frontend on Vercel
 
-Push to `main` → `.github/workflows/deploy.yml` verifies then SSHs in,
-`git reset --hard`, and `docker compose up -d --build`. Rollback = push an
-older commit.
+1. Push the repo to GitHub (done).
+2. In Vercel: **Add New Project** → import the repo → **Root Directory: `frontend`**.
+   - Framework auto-detected: **Vite**.
+3. Set the env var for the build:
+   - `VITE_API_URL` = `https://api.<domain>` (the Caddy API URL)
+4. Deploy. Every push to `main` (frontend changes) auto-deploys; PRs get preview URLs.
 
-## 7. Day-2 notes
+> The frontend build needs the API URL at **build time** (`import.meta.env.VITE_API_URL`).
+> If you ever want a runtime override, the client also reads `window.__FLICKFINDR_API__`.
 
-- **Updates:** `docker compose -f deploy/docker-compose.prod.yml pull` + `up -d`
-  after a deploy, plus periodic `apt upgrade` on the box.
-- **Backups:** `pg_dump` the `pgdata` volume regularly (cron or a script);
-  the S3 parquet files are your archival source of truth regardless.
-- **Cheapest agent model:** set `PI_MODEL` to your sub's cheapest model
-  (backend already falls back to first-available when empty).
-- **Cold-start:** none (always-on box). Watch the box's 1 OCPU idle usage is fine.
+## Day-2 notes
+
+- **Backups:** `pg_dump` the `pgdata` volume regularly; S3 parquet files remain the archival source of truth.
+- **Model:** set `PI_MODEL` in `deploy/.env` to your sub's cheapest model; restart backend.
+- **Region/CORS:** if you add a custom domain on Vercel, append it to `CORS_ORIGINS` in `deploy/.env` and redeploy the API.

@@ -8,20 +8,21 @@
  */
 
 /**
- * API base URL resolution:
- * 1. window.__FLICKFINDR_API__ — injected at runtime by /config.js (prod)
- * 2. fallback '' — same-origin /api proxy (Caddy/nginx in prod)
- * 3. localhost dev server (frontend on :5173, API on :8001)
+ * API base URL resolution (Vercel build-time):
+ * 1. import.meta.env.VITE_API_URL — set in Vercel project env
+ * 2. window.__FLICKFINDR_API__ — optional runtime override
+ * 3. dev fallback: localhost:8001
  */
 function resolveApiBase() {
+    const buildTime = import.meta.env?.VITE_API_URL;
+    if (typeof buildTime === 'string' && buildTime) return buildTime;
     try {
         const injected = window.__FLICKFINDR_API__;
         if (typeof injected === 'string' && injected) return injected;
     } catch {
         /* ignore */
     }
-    const isDev = window.location && window.location.hostname === 'localhost';
-    return isDev ? 'http://127.0.0.1:8001' : '';
+    return 'http://127.0.0.1:8001';
 }
 
 const API_BASE_URL = resolveApiBase();
