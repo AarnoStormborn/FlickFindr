@@ -4,3 +4,6 @@
 
 # Local Pi agent config (never share)
 .pi/
+
+# Deploy secrets
+deploy/.env

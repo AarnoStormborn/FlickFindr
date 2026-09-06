@@ -7,7 +7,24 @@
  * callers cannot mutate what the cache holds.
  */
 
-const API_BASE_URL = 'http://127.0.0.1:8001';
+/**
+ * API base URL resolution:
+ * 1. window.__FLICKFINDR_API__ — injected at runtime by /config.js (prod)
+ * 2. fallback '' — same-origin /api proxy (Caddy/nginx in prod)
+ * 3. localhost dev server (frontend on :5173, API on :8001)
+ */
+function resolveApiBase() {
+    try {
+        const injected = window.__FLICKFINDR_API__;
+        if (typeof injected === 'string' && injected) return injected;
+    } catch {
+        /* ignore */
+    }
+    const isDev = window.location && window.location.hostname === 'localhost';
+    return isDev ? 'http://127.0.0.1:8001' : '';
+}
+
+const API_BASE_URL = resolveApiBase();
 
 const responseCache = new Map();
 const inflight = new Map();
