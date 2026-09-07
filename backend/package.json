@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "ingest": "tsx scripts/ingest-csv.ts",
     "embeddings": "tsx scripts/generate-embeddings.ts",
+    "embeddings:remote": "tsx scripts/generate-embeddings-remote.ts",
     "init:db": "tsx scripts/init-db.ts",
     "fetch:movies": "tsx scripts/fetch-movies.ts",
     "check": "tsx scripts/check.ts"
