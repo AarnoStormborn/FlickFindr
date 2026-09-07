@@ -31,7 +31,7 @@ Browser
 1. Push this repo to GitHub.
 2. In Render → **New → Blueprint** → select the repo → it reads `render.yaml`.
    (Or: New → Web Service → root dir `backend`, runtime Node, build
-   `npm ci && npm run build`, start `node dist/src/index.js`, plan Free.)
+   `npm ci && npm run build`, start `node dist/index.js`, plan Free.)
 3. In the service **Environment**, set:
    - `DATABASE_URL` — your Supabase connection string
    - `CORS_ORIGINS` — your Vercel app URL (e.g. `https://flickfindr.vercel.app`)

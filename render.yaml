@@ -17,8 +17,10 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci && npm run build
-    startCommand: node dist/src/index.js
+    # --include=dev: Render sets NODE_ENV=production which makes plain
+    # 'npm ci' skip devDependencies (typescript etc.) and the build fails.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/index.js
     healthCheckPath: /
     envVars:
       - key: NODE_ENV

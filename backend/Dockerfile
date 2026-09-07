@@ -25,9 +25,8 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
 
-# Pre-warm the embedding model so the first search isn't slow. warm-embeddings
-# compiles to dist/scripts/warm-embeddings.js by the build stage (rootDir .).
+# Pre-warm the embedding model so the first search isn't slow.
 RUN mkdir -p /app/.cache && chmod -R 777 /app/.cache
 
 EXPOSE 8000
-CMD ["sh", "-c", "node dist/scripts/warm-embeddings.js && node dist/src/index.js"]
+CMD ["sh", "-c", "node dist/index.js"]
