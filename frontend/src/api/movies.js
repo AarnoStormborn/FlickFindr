@@ -195,3 +195,14 @@ export async function hybridSearch(params) {
         }),
     );
 }
+/**
+ * Fetch trailer videos for a movie (via TMDB). Cached by the shared cache.
+ */
+export async function getMovieTrailers(id) {
+    return cachedFetch(keyOf(['trailers', id]), () =>
+        fetchJson(`${API_BASE_URL}/flicks/movie/${id}/trailers`).then((d) => {
+            if (!Array.isArray(d.results)) throw new Error('Failed to fetch trailers');
+            return d.results;
+        }),
+    );
+}

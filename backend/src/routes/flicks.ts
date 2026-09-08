@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { logger } from "../logger.js";
 import type { MovieResult, Queryable } from "../models.js";
 import { toMovieResult } from "../services/structural.js";
+import { getMovieVideos } from "../tmdb.js";
 
 interface FlicksDeps {
   db: Queryable;
@@ -41,6 +42,31 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       return toMovieResult(rows[0]!);
     } catch (err) {
       logger.error({ err }, "Error fetching movie");
+      return reply.code(500).send({ detail: "Internal Server Error" });
+    }
+  });
+
+  app.get("/flicks/movie/:movie_id/trailers", async (request, reply) => {
+    try {
+      const movieId = Number((request.params as Record<string, unknown>).movie_id);
+      const { rows } = await db.query("SELECT tmdb_id FROM movies WHERE id = $1", [movieId]);
+      const tmdbId = Number(rows[0]?.tmdb_id ?? 0);
+      if (!tmdbId) {
+        // Movie may predate TMDB linkage; no trailers.
+        return { results: [] };
+      }
+      const videos = await getMovieVideos(tmdbId);
+      return {
+        results: videos.map((v) => ({
+          key: v.key,
+          name: v.name,
+          type: v.type,
+          site: v.site,
+          youtubeUrl: `https://www.youtube.com/watch?v=${v.key}`,
+        })),
+      };
+    } catch (err) {
+      logger.error({ err }, "Error fetching trailers");
       return reply.code(500).send({ detail: "Internal Server Error" });
     }
   });
