@@ -20,7 +20,10 @@ create table if not exists movies (
   votes varchar(20),
   gross varchar(20),
   poster_url text,
-  plot_embedding vector(384)
+  plot_embedding vector(384),
+  trailer_key text,
+  trailer_source text,
+  trailer_checked boolean not null default false
 );
 
 create unique index if not exists idx_movies_tmdb_id on movies (tmdb_id);

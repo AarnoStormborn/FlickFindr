@@ -49,21 +49,53 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
   app.get("/flicks/movie/:movie_id/trailers", async (request, reply) => {
     try {
       const movieId = Number((request.params as Record<string, unknown>).movie_id);
-      const { rows } = await db.query("SELECT tmdb_id FROM movies WHERE id = $1", [movieId]);
-      const tmdbId = Number(rows[0]?.tmdb_id ?? 0);
-      if (!tmdbId) {
-        // Movie may predate TMDB linkage; no trailers.
+      const { rows } = await db.query(
+        "SELECT tmdb_id, trailer_key, trailer_source, trailer_checked FROM movies WHERE id = $1",
+        [movieId],
+      );
+      const row = rows[0];
+      if (!row) {
+        return reply.code(404).send({ detail: `Movie not found for ID: ${movieId}` });
+      }
+
+      // 1. Already have a stored trailer -> serve it (never touch TMDB again).
+      if (row.trailer_key) {
+        return {
+          results: [
+            {
+              key: String(row.trailer_key),
+              source: row.trailer_source ?? "stored",
+              youtubeUrl: `https://www.youtube.com/watch?v=${row.trailer_key}`,
+            },
+          ],
+        };
+      }
+
+      // 2. Already checked and found nothing -> don't re-hit TMDB.
+      const tmdbId = Number(row.tmdb_id ?? 0);
+      if (row.trailer_checked || !tmdbId) {
         return { results: [] };
       }
+
+      // 3. First visit: fetch from TMDB, then persist so we never call again.
       const videos = await getMovieVideos(tmdbId);
+      const first = videos[0];
+      await db.query(
+        "UPDATE movies SET trailer_key = $1, trailer_source = $2, trailer_checked = true WHERE id = $3",
+        [first?.key ?? null, first ? "tmdb" : null, movieId],
+      );
       return {
-        results: videos.map((v) => ({
-          key: v.key,
-          name: v.name,
-          type: v.type,
-          site: v.site,
-          youtubeUrl: `https://www.youtube.com/watch?v=${v.key}`,
-        })),
+        results: first
+          ? [
+              {
+                key: first.key,
+                name: first.name,
+                type: first.type,
+                source: "tmdb",
+                youtubeUrl: `https://www.youtube.com/watch?v=${first.key}`,
+              },
+            ]
+          : [],
       };
     } catch (err) {
       logger.error({ err }, "Error fetching trailers");

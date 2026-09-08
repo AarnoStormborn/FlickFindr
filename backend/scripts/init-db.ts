@@ -36,6 +36,9 @@ async function main(): Promise<void> {
     // Migration for pre-existing databases (idempotent).
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS tmdb_id INTEGER");
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS release_year INTEGER");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS trailer_key TEXT");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS trailer_source TEXT");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS trailer_checked BOOLEAN NOT NULL DEFAULT false");
     // Plain unique index (NULLs allowed — they are distinct), so
     // ON CONFLICT (tmdb_id) resolves. Replaces any older partial index.
     await pool.query("DROP INDEX IF EXISTS idx_movies_tmdb_id");
