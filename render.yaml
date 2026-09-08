@@ -22,6 +22,17 @@ services:
     buildCommand: npm ci --include=dev && npm run build
     startCommand: node dist/index.js
     healthCheckPath: /
+    # Skip deploys for changes that don't affect this backend:
+    # docs, markdown, frontend (Vercel's), ingest, tooling, CI.
+    buildFilter:
+      ignoredPaths:
+        - 'docs/**'
+        - '**/*.md'
+        - 'frontend/**'
+        - 'pi-ingest/**'
+        - 'tools/**'
+        - 'supabase/**'
+        - '.github/**'
     envVars:
       - key: NODE_ENV
         value: production

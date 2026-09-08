@@ -5,9 +5,36 @@ on:
     branches: [main]
   pull_request:
 
+# Efficient CI: docs-only / non-code changes skip the heavy jobs but still
+# report a green check (so a required "CI" status never blocks a docs PR).
+# Code changes in backend/ or frontend/ run full checks.
+
 jobs:
+  # Always runs (cheap) — guarantees the CI check passes even when code jobs skip.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'render.yaml'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+
   backend:
     name: Backend (typecheck, test, build)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,6 +57,8 @@ jobs:
 
   frontend:
     name: Frontend (lint, build)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,3 +76,12 @@ jobs:
         run: npm run lint
       - name: Build
         run: npm run build
+
+  # Green signal even when both code jobs skip (docs-only changes).
+  done:
+    name: CI complete
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - run: echo "CI finished (code jobs skipped or passed)"
