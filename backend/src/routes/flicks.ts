@@ -78,7 +78,13 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       }
 
       // 3. First visit: fetch from TMDB, then persist so we never call again.
-      const videos = await getMovieVideos(tmdbId);
+      const { ok, videos } = await getMovieVideos(tmdbId);
+      // Only cache the result when TMDB actually responded. If the fetch
+      // failed (flaky network), leave trailer_checked=false so a later visit
+      // retries instead of being permanently marked 'no trailer'.
+      if (!ok) {
+        return reply.code(503).send({ detail: "Trailer service unavailable, try again" });
+      }
       const first = videos[0];
       await db.query(
         "UPDATE movies SET trailer_key = $1, trailer_source = $2, trailer_checked = true WHERE id = $3",
