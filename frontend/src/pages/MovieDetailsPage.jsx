@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getMovieById } from '../api/movies';
+import { getMovieById, getSimilarMovies } from '../api/movies';
+import MovieCard from '../components/MovieCard';
 import AddToListButton from '../components/AddToListButton';
 import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
@@ -12,6 +13,8 @@ export default function MovieDetailsPage() {
     const [movie, setMovie] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [similar, setSimilar] = useState([]);
+    const [similarLoading, setSimilarLoading] = useState(false);
 
     useEffect(() => {
         const fetchMovie = async () => {
@@ -19,6 +22,12 @@ export default function MovieDetailsPage() {
                 setLoading(true);
                 const data = await getMovieById(id);
                 setMovie(data);
+                // "More like this" — non-blocking; hide quietly if none.
+                setSimilarLoading(true);
+                getSimilarMovies(id, 12)
+                    .then((s) => setSimilar(s ?? []))
+                    .catch(() => setSimilar([]))
+                    .finally(() => setSimilarLoading(false));
             } catch (err) {
                 console.error('Failed to fetch movie:', err);
                 setError('Movie not found');
@@ -198,6 +207,18 @@ export default function MovieDetailsPage() {
                     </div>
                 </div>
             </section>
+
+            {/* More Like This */}
+            {!loading && !error && !similarLoading && similar.length > 0 && (
+                <section className="similar-section">
+                    <h2 className="similar-title">More Like This</h2>
+                    <div className="similar-row">
+                        {similar.map((m) => (
+                            <MovieCard key={m.id} movie={m} />
+                        ))}
+                    </div>
+                </section>
+            )}
         </div>
     );
 }
