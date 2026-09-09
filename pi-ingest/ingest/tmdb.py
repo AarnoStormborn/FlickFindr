@@ -101,6 +101,17 @@ class TmdbClient:
             return {}
         return data
 
+    def trailer_key(self, movie_id: int) -> str | None:
+        """First YouTube Trailer/Teaser key for a movie, or None.
+        Raises TmdbError when TMDB is unreachable so callers can distinguish
+        'no trailer exists' from 'couldn't reach TMDB' (important: a network
+        failure must NOT be recorded as a permanent no-trailer)."""
+        data = self._get_json(f"/movie/{movie_id}/videos", {})
+        for v in data.get("results", []):
+            if v.get("site") == "YouTube" and v.get("key") and v.get("type") in ("Trailer", "Teaser"):
+                return v["key"]
+        return None
+
     def credits_and_detail(self, movie_id: int) -> tuple[str | None, str | None, int | None, int | None]:
         """(directors, stars, runtime_minutes, revenue) — one round trip per
         movie keeps the enrichment calls batched and bounded."""
