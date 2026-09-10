@@ -78,6 +78,14 @@ describe("FlickFindr API (injected deps)", () => {
     expect(res.json().id).toBe(1);
   });
 
+  it("GET /flicks/movie/:id/trailers returns empty results (no tmdb_id in fixture)", async () => {
+    const res = await app.inject({ method: "GET", url: "/flicks/movie/1/trailers" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(Array.isArray(body.results)).toBe(true);
+    expect(body.results).toHaveLength(0);
+  });
+
   it("POST /search/structural returns paginated response", async () => {
     const res = await app.inject({
       method: "POST",
