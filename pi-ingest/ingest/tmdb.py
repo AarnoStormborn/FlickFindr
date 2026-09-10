@@ -4,6 +4,7 @@ TMDB's 500-page cap handled by range splitting, and credits enrichment."""
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -13,6 +14,40 @@ log = logging.getLogger("ingest.tmdb")
 
 BACKOFF_BASE_MS = 1_000
 MAX_ATTEMPTS = 8
+
+# Trailer selection quality filters (see TmdbClient.trailer_key).
+# Hard skip: accessibility/localisation variants that are not the main trailer.
+HARD_SKIP_RE = re.compile(r"sign language|\basl\b", re.I)
+# Soft penalty: marketing noise that should never outrank a real trailer.
+BAD_NAME_RE = re.compile(
+    r"\bshorts?\b|vertical|#short|cinemas now|see it again|tickets|on sale|book now"
+    r"|livestream|featurette|behind the scenes|interview|\bspot\b|reaction|review"
+    r"|\bclip\b|memories|\btalk\b|day one|production|reveal|teaser for",
+    re.I,
+)
+
+
+def _trailer_score(v: dict[str, Any]) -> int:
+    """Rank a TMDB video entry; higher is a better 'main trailer' candidate."""
+    name = v.get("name") or ""
+    score = 0
+    if v.get("type") == "Trailer":
+        score += 100
+    elif v.get("type") == "Teaser":
+        score += 30
+    if v.get("official") is True:
+        score += 60
+    if re.search(r"official trailer", name, re.I):
+        score += 40
+    if v.get("iso_639_1") == "en":
+        score += 30
+    if v.get("iso_3166_1") == "US":
+        score += 20
+    size = v.get("size") or 0
+    score += 25 if size >= 2000 else 18 if size >= 1000 else 8 if size >= 700 else 0
+    if BAD_NAME_RE.search(name):
+        score -= 60
+    return score
 
 
 class TmdbError(RuntimeError):
@@ -102,15 +137,32 @@ class TmdbClient:
         return data
 
     def trailer_key(self, movie_id: int) -> str | None:
-        """First YouTube Trailer/Teaser key for a movie, or None.
+        """Best YouTube trailer key for a movie, or None.
+
+        TMDB's /videos list mixes official trailers with teasers, featurettes,
+        regional marketing spots, sign-language versions and Shorts, so we
+        score candidates instead of taking the first:
+          + Trailer type, + official flag, + "official trailer" in the name,
+          + English / US locale, + higher resolution; hard-skip sign-language
+            versions, and penalise Shorts / clips / "in cinemas now" spots.
+        Ties break by earliest published_at (the canonical main trailer).
+
         Raises TmdbError when TMDB is unreachable so callers can distinguish
         'no trailer exists' from 'couldn't reach TMDB' (important: a network
         failure must NOT be recorded as a permanent no-trailer)."""
         data = self._get_json(f"/movie/{movie_id}/videos", {})
-        for v in data.get("results", []):
-            if v.get("site") == "YouTube" and v.get("key") and v.get("type") in ("Trailer", "Teaser"):
-                return v["key"]
-        return None
+        cands = [
+            v
+            for v in data.get("results", [])
+            if v.get("site") == "YouTube"
+            and v.get("key")
+            and v.get("type") in ("Trailer", "Teaser")
+            and not HARD_SKIP_RE.search(v.get("name") or "")
+        ]
+        if not cands:
+            return None
+        cands.sort(key=lambda v: (-_trailer_score(v), v.get("published_at") or "9999"))
+        return cands[0]["key"]
 
     def credits_and_detail(self, movie_id: int) -> tuple[str | None, str | None, int | None, int | None]:
         """(directors, stars, runtime_minutes, revenue) — one round trip per
