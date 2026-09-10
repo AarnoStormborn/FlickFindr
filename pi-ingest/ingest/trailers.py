@@ -95,10 +95,12 @@ def run() -> None:
         all_ids = all_ids[:limit]
     log.info("catalog has %s movies%s", len(all_ids), f" (testing: limit {limit})" if limit else "")
 
-    # Resume: skip ids already recorded in the pulls table.
-    done = store.pulls_exist(all_ids)
+    # Resume: skip ids already recorded in the pulls table. TRAILER_REFRESH=1
+    # re-fetches everything (used to fix previously stored bad trailer keys).
+    refresh = os.environ.get("TRAILER_REFRESH", "") not in ("", "0", "false")
+    done = set() if refresh else store.pulls_exist(all_ids)
     pending = [i for i in all_ids if i not in done]
-    log.info("%s already done, %s to fetch", len(done), len(pending))
+    log.info("%s already done, %s to fetch%s", len(done), len(pending), " (REFRESH)" if refresh else "")
     if not pending:
         log.info("nothing to do")
         return
