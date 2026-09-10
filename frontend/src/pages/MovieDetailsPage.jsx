@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getMovieById, getSimilarMovies } from '../api/movies';
+import { getMovieById, getMovieTrailers, getSimilarMovies } from '../api/movies';
 import MovieCard from '../components/MovieCard';
 import AddToListButton from '../components/AddToListButton';
 import { useListsContext } from '../context/useListsContext';
@@ -15,6 +15,8 @@ export default function MovieDetailsPage() {
     const [error, setError] = useState(null);
     const [similar, setSimilar] = useState([]);
     const [similarLoading, setSimilarLoading] = useState(false);
+    const [trailers, setTrailers] = useState([]);
+    const [activeTrailer, setActiveTrailer] = useState(null);
 
     useEffect(() => {
         const fetchMovie = async () => {
@@ -22,6 +24,10 @@ export default function MovieDetailsPage() {
                 setLoading(true);
                 const data = await getMovieById(id);
                 setMovie(data);
+                // Trailers are a nice-to-have; never block the page on them.
+                getMovieTrailers(id)
+                    .then((t) => setTrailers(t))
+                    .catch(() => setTrailers([]));
                 // "More like this" — non-blocking; hide quietly if none.
                 setSimilarLoading(true);
                 getSimilarMovies(id, 12)
@@ -142,17 +148,30 @@ export default function MovieDetailsPage() {
                             )}
                         </div>
 
-                        {/* Actions: save to list */}
-                        {listsApi && movie && (
+                        {/* Actions: save to list + trailer */}
+                        {(listsApi || trailers.length > 0) && movie && (
                             <div className="movie-actions">
-                                <AddToListButton
-                                    movie={movie}
-                                    lists={listsApi.lists}
-                                    toggleList={listsApi.toggleMovieInList}
-                                    createAndSave={listsApi.createListAndSave}
-                                    isSaved={listsApi.isSaved}
-                                    variant="plain"
-                                />
+                                {listsApi && (
+                                    <AddToListButton
+                                        movie={movie}
+                                        lists={listsApi.lists}
+                                        toggleList={listsApi.toggleMovieInList}
+                                        createAndSave={listsApi.createListAndSave}
+                                        isSaved={listsApi.isSaved}
+                                        variant="plain"
+                                    />
+                                )}
+                                {trailers.length > 0 && (
+                                    <button
+                                        className="trailer-button"
+                                        onClick={() => setActiveTrailer(trailers[0])}
+                                    >
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                        Watch trailer
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -218,6 +237,24 @@ export default function MovieDetailsPage() {
                         ))}
                     </div>
                 </section>
+            )}
+
+            {/* Trailer lightbox */}
+            {activeTrailer && (
+                <div className="trailer-modal" onClick={() => setActiveTrailer(null)} role="dialog" aria-modal="true" aria-label="Trailer">
+                    <div className="trailer-modal-box" onClick={(e) => e.stopPropagation()}>
+                        <button className="trailer-close" onClick={() => setActiveTrailer(null)} aria-label="Close">
+                            ✕
+                        </button>
+                        <iframe
+                            className="trailer-frame"
+                            src={`https://www.youtube.com/embed/${activeTrailer.key}?autoplay=1`}
+                            title={activeTrailer.name || 'Trailer'}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );
