@@ -20,9 +20,11 @@ MAX_ATTEMPTS = 8
 HARD_SKIP_RE = re.compile(r"sign language|\basl\b", re.I)
 # Soft penalty: marketing noise that should never outrank a real trailer.
 BAD_NAME_RE = re.compile(
-    r"\bshorts?\b|vertical|#short|cinemas now|see it again|tickets|on sale|book now"
-    r"|livestream|featurette|behind the scenes|interview|\bspot\b|reaction|review"
-    r"|\bclip\b|memories|\btalk\b|day one|production|reveal|teaser for",
+    r"\bshorts?\b|vertical|#short|first look|comic[- ]con|sneak peek|announcement"
+    r"|exclusive|now playing|streaming|\bspecial\b|prologue|cinemas now|see it again"
+    r"|tickets|on sale|book now|buy tickets|own it|livestream|featurette|behind the scenes"
+    r"|interview|\bspot\b|reaction|review|\bclip\b|memories|\btalk\b|day one|production"
+    r"|reveal|\bbonus\b",
     re.I,
 )
 
@@ -39,6 +41,13 @@ def _trailer_score(v: dict[str, Any]) -> int:
         score += 60
     if re.search(r"official trailer", name, re.I):
         score += 40
+    if re.search(r"\btrailer\b", name, re.I):
+        score += 25
+    if re.search(r"\bmain trailer\b|\bfinal trailer\b", name, re.I):
+        score += 30
+    # A teaser is a teaser even when TMDB types it 'Trailer'.
+    if re.search(r"teaser", name, re.I):
+        score -= 35
     if v.get("iso_639_1") == "en":
         score += 30
     if v.get("iso_3166_1") == "US":
@@ -161,7 +170,9 @@ class TmdbClient:
         ]
         if not cands:
             return None
-        cands.sort(key=lambda v: (-_trailer_score(v), v.get("published_at") or "9999"))
+        # Highest score first; among equal scores prefer the LATEST upload
+        # (main/final trailers land after teasers and Comic-Con first looks).
+        cands.sort(key=lambda v: (_trailer_score(v), v.get("published_at") or ""), reverse=True)
         return cands[0]["key"]
 
     def credits_and_detail(self, movie_id: int) -> tuple[str | None, str | None, int | None, int | None]:

@@ -28,9 +28,11 @@ const cache = new Map<string, { ts: number; value: TrailerLookup }>();
 const HARD_SKIP_RE = /sign language|\basl\b/i;
 // Soft penalty: marketing noise that should never outrank a real trailer.
 const BAD_NAME_RE = new RegExp(
-  "\\bshorts?\\b|vertical|#short|cinemas now|see it again|tickets|on sale|book now" +
-    "|livestream|featurette|behind the scenes|interview|\\bspot\\b|reaction|review" +
-    "|\\bclip\\b|memories|\\btalk\\b|day one|production|reveal|teaser for",
+  "\\bshorts?\\b|vertical|#short|first look|comic[- ]con|sneak peek|announcement" +
+    "|exclusive|now playing|streaming|\\bspecial\\b|prologue|cinemas now|see it again" +
+    "|tickets|on sale|book now|buy tickets|own it|livestream|featurette|behind the scenes" +
+    "|interview|\\bspot\\b|reaction|review|\\bclip\\b|memories|\\btalk\\b|day one|production" +
+    "|reveal|\\bbonus\\b",
   "i",
 );
 
@@ -50,6 +52,10 @@ function trailerScore(v: RankableVideo): number {
   else if (v.type === "Teaser") score += 30;
   if (v.official === true) score += 60;
   if (/official trailer/i.test(name)) score += 40;
+  if (/\btrailer\b/i.test(name)) score += 25;
+  if (/\bmain trailer\b|\bfinal trailer\b/i.test(name)) score += 30;
+  // A teaser is a teaser even when TMDB types it 'Trailer'.
+  if (/teaser/i.test(name)) score -= 35;
   if (v.iso_639_1 === "en") score += 30;
   if (v.iso_3166_1 === "US") score += 20;
   const size = v.size ?? 0;
@@ -110,7 +116,9 @@ export async function getMovieVideos(tmdbId: number): Promise<TrailerLookup> {
     .sort((a, b) => {
       const byScore = trailerScore(b) - trailerScore(a);
       if (byScore !== 0) return byScore;
-      return (a.published_at ?? "9999").localeCompare(b.published_at ?? "9999");
+      // Equal scores: prefer the LATEST upload (main/final trailers land after
+      // teasers and Comic-Con first looks).
+      return (b.published_at ?? "").localeCompare(a.published_at ?? "");
     });
   const result: TrailerLookup = { ok: true, videos };
   cache.set(cacheKey, { ts: Date.now(), value: result });
