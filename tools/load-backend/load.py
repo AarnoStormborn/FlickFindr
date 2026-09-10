@@ -70,6 +70,7 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Load S3 parquet movies into backend Postgres")
     p.add_argument("--prefix", default="movies", help="S3 prefix (default: movies)")
     p.add_argument("--year", help="only load this year partition (e.g. 2024)")
+    p.add_argument("--trailers", action="store_true", help="load movies/trailers/*.parquet -> trailer columns")
     p.add_argument("--dry-run", action="store_true", help="count only, no DB writes")
     return p.parse_args()
 
@@ -110,10 +111,52 @@ ON CONFLICT (tmdb_id) DO UPDATE SET
 """
 
 
+def _load_trailers(s3, bucket: str, db_url: str, dry_run: bool) -> None:
+    """Load movies/trailers/*.parquet -> movies.trailer_key (by tmdb_id)."""
+    import psycopg
+
+    keys = []
+    for page in s3.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix="movies/trailers/"):
+        keys += [o["Key"] for o in page.get("Contents", []) if o["Key"].endswith(".parquet")]
+    if not keys:
+        sys.exit("No trailer parquet files found under movies/trailers/")
+    print(f"{len(keys)} trailer files")
+
+    total = updated = 0
+    with psycopg.connect(db_url) as conn:
+        with conn.cursor() as cur:
+            for key in sorted(keys):
+                for row in _rows_from_s3(s3, bucket, key):
+                    tkey = row.get("trailer_key")
+                    tid = row.get("tmdb_id")
+                    if not tkey or tid is None:
+                        continue
+                    total += 1
+                    if dry_run:
+                        continue
+                    cur.execute(
+                        "UPDATE movies SET trailer_key = %s, trailer_source = %s, trailer_checked = true WHERE tmdb_id = %s",
+                        (tkey, row.get("source") or "tmdb", int(tid)),
+                    )
+                    updated += cur.rowcount
+                if not dry_run:
+                    conn.commit()
+                print(f"{key}: done (matched {updated})", flush=True)
+    if dry_run:
+        print(f"dry-run: would set {total} trailers")
+    else:
+        print(f"Loaded trailers: {total} rows processed, {updated} movies updated")
+
+
 def main() -> None:
     args = _parse_args()
     aws, bucket, db_url = _cfg()
     s3 = boto3.client("s3", region_name="us-east-1", **aws)
+
+    if args.trailers:
+        _load_trailers(s3, bucket, db_url, args.dry_run)
+        return
+
     keys = _list_keys(s3, bucket, args.prefix, args.year)
     if not keys:
         sys.exit(f"No parquet files found under s3://{bucket}/{args.prefix}/…")
