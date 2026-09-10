@@ -196,6 +196,18 @@ export async function hybridSearch(params) {
     );
 }
 /**
+ * Fetch "More Like This" movies (genre-aware embedding neighbors).
+ */
+export async function getSimilarMovies(id, limit = 12) {
+    return cachedFetch(keyOf(['similar', id, limit]), () =>
+        fetchJson(`${API_BASE_URL}/flicks/movie/${id}/similar?limit=${limit}`).then((d) => {
+            if (!Array.isArray(d.results)) throw new Error('Failed to fetch similar movies');
+            return d.results;
+        }),
+    );
+}
+
+/**
  * Fetch trailer videos for a movie (via TMDB). Cached by the shared cache.
  */
 export async function getMovieTrailers(id) {

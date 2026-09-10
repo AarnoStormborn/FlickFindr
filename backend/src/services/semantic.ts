@@ -151,4 +151,32 @@ export const semanticService = {
       throw err;
     }
   },
+
+  /**
+   * "More like this": nearest neighbours by plot-embedding similarity to a
+   * given movie id. Excludes the movie itself; skips movies without a vector.
+   */
+  async similarMovies(db: Queryable, movieId: number, limit = 12): Promise<MovieResult[]> {
+    // Plot-embedding similarity alone is noisy (e.g. Inception → random
+    // dramas). Require sharing at least one genre token with the source
+    // movie, then rank by embedding similarity — keeps results topical.
+    const cols =
+      "id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url";
+    const sql = `WITH src AS (SELECT id, genre, plot_embedding FROM movies WHERE id = $1)
+      SELECT m.${cols.replaceAll(", ", ", m.")},
+        1 - (m.plot_embedding <=> src.plot_embedding) AS similarity_score
+      FROM movies m, src
+      WHERE m.id <> src.id
+        AND m.plot_embedding IS NOT NULL
+        AND src.genre IS NOT NULL
+        -- share at least one comma-separated genre token
+        AND EXISTS (
+          SELECT 1 FROM unnest(string_to_array(src.genre, ',')) g(genre)
+          WHERE m.genre ILIKE '%' || trim(g.genre) || '%'
+        )
+      ORDER BY similarity_score DESC
+      LIMIT $2`;
+    const { rows } = await db.query(sql, [movieId, limit]);
+    return rows.map(toSemanticResult);
+  },
 };
