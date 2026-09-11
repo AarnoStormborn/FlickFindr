@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getMovieById, getMovieTrailers, getSimilarMovies } from '../api/movies';
-import MovieCard from '../components/MovieCard';
+import MovieCarousel from '../components/MovieCarousel';
 import AddToListButton from '../components/AddToListButton';
 import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
@@ -231,11 +231,7 @@ export default function MovieDetailsPage() {
             {!loading && !error && !similarLoading && similar.length > 0 && (
                 <section className="similar-section">
                     <h2 className="similar-title">More Like This</h2>
-                    <div className="similar-row">
-                        {similar.map((m) => (
-                            <MovieCard key={m.id} movie={m} />
-                        ))}
-                    </div>
+                    <MovieCarousel movies={similar} />
                 </section>
             )}
 
