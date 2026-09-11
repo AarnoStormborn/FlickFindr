@@ -8,4 +8,4 @@ __pycache__/
 *.db-shm
 .tmp/
 .eggs/
-*.egg-info/
+*.egg-info/.trailers-loaded.json

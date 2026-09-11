@@ -103,6 +103,51 @@ WantedBy=multi-user.target
 are never re-pulled, run it periodically (e.g. `systemd.timer` monthly) to
 pick up new releases without redoing history.
 
+## Trailer refresh job
+
+A second job keeps movie trailers fresh (see `ingest/trailers.py` and
+`ingest/load_trailers.py`):
+
+1. `python -m ingest.trailers` — for every catalog `tmdb_id` not yet
+   processed, pick the best TMDB YouTube trailer (scored: official / main
+   trailer / English-US / high-res; sign-language versions and Shorts are
+   rejected) and write `movies/trailers/part-*.parquet` to S3.
+2. `python -m ingest.load_trailers` — load newly-written parts into the app
+   DB (`movies.trailer_key`), tracked in `.trailers-loaded.json` so repeat
+   runs only push new parts.
+
+Requires `DATABASE_URL` (app Postgres) in `.env`.
+
+Run manually:
+
+```bash
+.venv/bin/python -m ingest.trailers        # fetch (resume-safe)
+.venv/bin/python -m ingest.load_trailers   # load into DB (incremental)
+
+# Re-fetch everything (e.g. after changing trailer selection rules):
+TRAILER_REFRESH=1 .venv/bin/python -m ingest.trailers
+```
+
+### systemd (monthly)
+
+`deploy/flickfindr-trailers.{service,timer}` run both steps monthly (the 1st
+at 02:00, two hours after the catalog ingest), with `Nice=10` and
+`CPUWeight=50` so the Pi's other ingestion work stays responsive:
+
+```bash
+sudo cp deploy/flickfindr-trailers.service deploy/flickfindr-trailers.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now flickfindr-trailers.timer
+systemctl list-timers flickfindr-trailers
+```
+
+Inspect a run:
+
+```bash
+sudo systemctl start flickfindr-trailers.service   # run now
+journalctl -u flickfindr-trailers -f
+```
+
 ## Local dev / tests
 
 ```bash

@@ -1,0 +1,17 @@
+[Unit]
+Description=FlickFindr trailer refresh (TMDB -> S3 -> DB)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/flickfindr-pi-ingest
+# 1. fetch trailers for movies not yet processed (resume-safe ledger)
+# 2. load the newly-written parquet parts into the app DB (incremental)
+ExecStart=/bin/sh -c '.venv/bin/python -m ingest.trailers && .venv/bin/python -m ingest.load_trailers'
+# Politeness: the Pi also runs another project's ingestion job + the catalog job.
+Nice=10
+CPUWeight=50
+MemoryMax=384M
+StandardOutput=journal
+StandardError=journal
