@@ -4,6 +4,7 @@ import MovieCard from '../components/MovieCard';
 import { searchMovies } from '../api/movies';
 import { shelfById, eraParams } from '../data/shelves';
 import './GenrePage.css';
+import LoadingQuips from '../components/LoadingQuips';
 
 const MOVIES_PER_PAGE = 20;
 
@@ -119,7 +120,7 @@ export default function EraPage() {
             {loading ? (
                 <div className="genre-loading">
                     <div className="loading-spinner"></div>
-                    <p>Loading movies...</p>
+                    <LoadingQuips />
                 </div>
             ) : error ? (
                 <div className="genre-error">

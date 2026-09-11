@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import MovieCard from '../components/MovieCard';
 import { searchMovies } from '../api/movies';
 import './GenrePage.css';
+import LoadingQuips from '../components/LoadingQuips';
 
 export default function GenrePage() {
     const { name } = useParams();
@@ -112,7 +113,7 @@ export default function GenrePage() {
             {loading ? (
                 <div className="genre-loading">
                     <div className="loading-spinner"></div>
-                    <p>Loading movies...</p>
+                    <LoadingQuips />
                 </div>
             ) : error ? (
                 <div className="genre-error">

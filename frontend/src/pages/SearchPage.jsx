@@ -8,6 +8,7 @@ import { hybridSearch, semanticSearch, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
 import useSearchHistory from '../hooks/useSearchHistory';
 import './SearchPage.css';
+import LoadingQuips from '../components/LoadingQuips';
 
 const TEXT_MODES = ['hybrid', 'semantic'];
 const MODES = [
@@ -358,7 +359,7 @@ export default function SearchPage() {
                 {loading && (
                     <div className="search-loading">
                         <div className="loading-spinner"></div>
-                        <p>Searching movies…</p>
+                        <LoadingQuips />
                     </div>
                 )}
 
