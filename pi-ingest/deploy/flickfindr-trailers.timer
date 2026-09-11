@@ -1,0 +1,13 @@
+[Unit]
+Description=Monthly FlickFindr trailer refresh
+
+[Timer]
+# Run on the 1st of each month, two hours after the catalog ingest timer
+# (flickfindr-ingest.timer) so newly-added movies are already on S3.
+OnCalendar=*-*-01 02:00:00
+Persistent=true
+AccuracySec=1h
+RandomizedDelaySec=30min
+
+[Install]
+WantedBy=timers.target
