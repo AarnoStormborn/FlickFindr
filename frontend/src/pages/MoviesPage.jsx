@@ -7,6 +7,7 @@ import { getMoviesByGenre, searchMovies } from '../api/movies';
 import { YEAR_SHELVES, GENRE_ROWS, BEST_OF_MIN_VOTES, LATEST_MIN_VOTES } from '../data/shelves';
 import useViewMode from '../hooks/useViewMode';
 import './MoviesPage.css';
+import LoadingQuips from '../components/LoadingQuips';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -167,7 +168,7 @@ export default function MoviesPage() {
                         {topLoading ? (
                             <div className="genre-loading">
                                 <div className="loading-spinner"></div>
-                                <p>Loading movies...</p>
+                                <LoadingQuips />
                             </div>
                         ) : (
                             <MovieListTable movies={topMovies} emptyText="No movies found" />
