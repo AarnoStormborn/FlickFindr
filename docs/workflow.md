@@ -56,3 +56,8 @@ gh pr create --base main --head dev --title "release: <summary>"
   pushes then produce preview deployments only.
 - **Render** — the web service's branch must remain `main`, with auto-deploy
   set to *after CI checks pass*, so `dev` merges never reach production.
+
+## Related
+
+- [`docs/roadmap.md`](roadmap.md) — positioning, what's shipped, what's next.
+- [`deploy/README.md`](../deploy/README.md) — provider setup and first deploy.
