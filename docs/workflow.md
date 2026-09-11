@@ -52,3 +52,5 @@ gh pr create --base main --head dev --title "release: <summary>"
   pushes then produce preview deployments only.
 - **Render** — the web service's branch must remain `main`, with auto-deploy
   set to *after CI checks pass*, so `dev` merges never reach production.
+
+_(guard enforcement test)_
