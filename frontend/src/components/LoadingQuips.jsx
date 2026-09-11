@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { QUICK_QUIPS, SLOW_QUIPS } from './quipPools';
 import './LoadingQuips.css';
 
 /**
@@ -15,38 +16,6 @@ import './LoadingQuips.css';
 
 const ROTATE_MS = 2500;
 const ESCALATE_MS = 6000;
-
-const QUICK = [
-    'Rolling the film…',
-    'Warming up the projector…',
-    'Threading the reel…',
-    'Dimming the lights…',
-    'Adjusting the tracking…',
-    'Shushing the row behind you…',
-    'Buying overpriced popcorn…',
-    'Rendering the unskippable studio logos…',
-    'Checking for a post-credits scene…',
-    'Consulting the Criterion shelf…',
-    'Sorting by vibes…',
-    'Reticulating cinephiles…',
-    'Fast-forwarding through the trailers…',
-    'Confirming the book was better…',
-    'Debating whether Die Hard is a Christmas movie…',
-    'Arguing about the best Nolan film…',
-];
-
-const SLOW = [
-    'The server was napping. We’re poking it…',
-    'Waking the projectionist…',
-    'The server stepped out for a smoke break…',
-    'Bribing the server with popcorn…',
-    'It’s not buffering, it’s method acting…',
-    'The server is booting like a 1997 DVD player…',
-    'Negotiating with the cloud…',
-    'Paging the ghost in the machine…',
-    'Waiting for the audience to stop talking…',
-    'Teaching the model to appreciate French New Wave…',
-];
 
 /** Fisher–Yates shuffle (returns a new array). */
 function shuffled(items) {
@@ -74,14 +43,14 @@ function usePrefersReducedMotion() {
 
 export default function LoadingQuips({ className = '' }) {
     const reducedMotion = usePrefersReducedMotion();
-    const [pool, setPool] = useState(() => shuffled(QUICK));
+    const [pool, setPool] = useState(() => shuffled(QUICK_QUIPS));
     const [index, setIndex] = useState(0);
 
     useEffect(() => {
         if (reducedMotion) return undefined;
         const rotate = setInterval(() => setIndex((i) => i + 1), ROTATE_MS);
         const escalate = setTimeout(() => {
-            setPool(shuffled(SLOW));
+            setPool(shuffled(SLOW_QUIPS));
             setIndex(0);
         }, ESCALATE_MS);
         return () => {
