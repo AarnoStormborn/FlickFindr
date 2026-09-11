@@ -55,8 +55,16 @@ async function cachedFetch(key, fetcher) {
 }
 
 function clonePayload(data) {
-    if (Array.isArray(data)) return data.map((x) => ({ ...x }));
-    if (data && typeof data === 'object') return { ...data };
+    if (Array.isArray(data)) return data.map((x) => (x && typeof x === 'object' ? { ...x } : x));
+    if (data && typeof data === 'object') {
+        const copy = { ...data };
+        // Clone nested result rows too, otherwise a caller mutating
+        // `results[0]` would corrupt the cached payload.
+        if (Array.isArray(data.results)) {
+            copy.results = data.results.map((x) => (x && typeof x === 'object' ? { ...x } : x));
+        }
+        return copy;
+    }
     return data;
 }
 

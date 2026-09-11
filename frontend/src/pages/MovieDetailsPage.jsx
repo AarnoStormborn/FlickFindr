@@ -5,6 +5,7 @@ import MovieCarousel from '../components/MovieCarousel';
 import AddToListButton from '../components/AddToListButton';
 import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
+import LoadingQuips from '../components/LoadingQuips';
 
 export default function MovieDetailsPage() {
     const { id } = useParams();
@@ -64,7 +65,7 @@ export default function MovieDetailsPage() {
             <div className="movie-details-page">
                 <div className="movie-details-loading">
                     <div className="loading-spinner"></div>
-                    <p>Loading movie details...</p>
+                    <LoadingQuips />
                 </div>
             </div>
         );
