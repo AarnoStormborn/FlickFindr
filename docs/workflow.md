@@ -19,8 +19,12 @@ feature branch ──PR──▶ dev ──PR──▶ main ──▶ production
   `git checkout dev && git pull && git checkout -b feat/my-feature`
 - Open PRs **into `dev`**. CI (typecheck, tests, build) gates every PR.
 - Promote to production by opening a PR `dev → main` (release).
-- Keep `dev` current with `main` after a release:
-  `git checkout dev && git merge main` (or reset if histories are linear).
+- After a release, resync `dev` to `main` — squash merges rewrite commits, so
+the two branches converge in content but not in history:
+  ```bash
+  git checkout dev && git reset --hard main && git push --force-with-lease origin dev
+  ```
+  Do this only right after a release, while `dev` has no unreleased work.
 
 ## CI behaviour
 
