@@ -429,7 +429,8 @@
    ======================================== */
 
 .similar-section {
-    padding: var(--space-2xl) 10% 0;
+    /* Generous bottom space so the row isn't flush with the page end. */
+    padding: var(--space-2xl) 10% var(--space-3xl);
 }
 
 .similar-title {
@@ -438,20 +439,13 @@
     margin-bottom: var(--space-lg);
 }
 
-.similar-row {
-    display: flex;
-    gap: var(--space-md);
-    overflow-x: auto;
-    padding-bottom: var(--space-md);
-    scrollbar-width: none;
+/* Arrows from MovieCarousel sit inside the section's 10% gutters. */
+.similar-section .carousel-arrow-left {
+    left: 0;
 }
 
-.similar-row::-webkit-scrollbar {
-    display: none;
-}
-
-.similar-row .movie-card {
-    flex-shrink: 0;
+.similar-section .carousel-arrow-right {
+    right: 0;
 }
 
 @media (max-width: 768px) {
