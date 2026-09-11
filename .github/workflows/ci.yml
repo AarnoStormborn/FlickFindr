@@ -2,12 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
 
-# Efficient CI: docs-only / non-code changes skip the heavy jobs but still
-# report a green check (so a required "CI" status never blocks a docs PR).
-# Code changes in backend/ or frontend/ run full checks.
+# Branch model:
+#   main = production (only merges from dev, protected)
+#   dev  = integration (feature branches merge here first)
+# CI runs on PRs (any base) and on pushes to main/dev. Docs-only changes skip
+# the heavy jobs but still report a green check, so a required "CI" status
+# never blocks a docs-only PR.
 
 jobs:
   # Always runs (cheap) — guarantees the CI check passes even when code jobs skip.
