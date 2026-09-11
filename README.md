@@ -33,4 +33,22 @@ Free, managed stack — see [`deploy/README.md`](deploy/README.md):
 - **Database** → Supabase free tier (Postgres + pgvector; `supabase/schema.sql`)
 - **Catalog data** → S3 parquet → Supabase via `tools/load-backend/load.py`
 
+## Docs
+
+| Doc | What's in it |
+|---|---|
+| [`docs/roadmap.md`](docs/roadmap.md) | Positioning, what's shipped, what's next |
+| [`docs/workflow.md`](docs/workflow.md) | Branching model (feature → dev → main) and deploy targets |
+| [`docs/FRONTEND_DESIGN_INSPIRATION.md`](docs/FRONTEND_DESIGN_INSPIRATION.md) | The design direction the UI follows |
+| [`backend/README.md`](backend/README.md) | API surface, scripts, agent configuration |
+| [`pi-ingest/README.md`](pi-ingest/README.md) | Raspberry Pi ingestion + trailer refresh jobs |
+| [`deploy/README.md`](deploy/README.md) | Production deployment (Vercel / Render / Supabase) |
+
+## Tests
+
+```bash
+cd backend  && npm test    # 21 tests
+cd frontend && npm test    # 35 tests
+```
+
 See `backend/README.md` for the API surface and agent configuration.
