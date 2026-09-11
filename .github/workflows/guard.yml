@@ -1,0 +1,25 @@
+name: Guard
+
+# Enforces the branch model: main is production and only accepts merges from
+# dev. Feature branches must target dev instead. This blocks the footgun of a
+# feature PR accidentally deploying straight to production on merge.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  main-branch-guard:
+    name: Main branch guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only dev may merge into main
+        run: |
+          src="${{ github.head_ref }}"
+          if [ "$src" != "dev" ]; then
+            echo "::error::PRs into 'main' must come from 'dev' (got '$src')."
+            echo "Open the pull request against 'dev' instead, then promote to"
+            echo "production with a separate dev -> main release PR."
+            exit 1
+          fi
+          echo "Source branch is 'dev' — OK."
