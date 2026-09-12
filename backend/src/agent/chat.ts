@@ -33,6 +33,38 @@ export interface ChatMovie {
   poster_url: string | null;
 }
 
+/**
+ * Gist length for plot text sent back to the model. Full synopses are the
+ * single biggest cost in a tool result and the agent only needs enough to
+ * judge thematic fit; it can call get_movie for the full text.
+ */
+const PLOT_SNIPPET_CHARS = 200;
+
+/**
+ * Compact projection of a movie row for the MODEL.
+ *
+ * Full rows carry plot + directors + stars + votes + gross + poster_url, which
+ * an agent re-sends on every step of a tool loop — that dominates token spend
+ * and is what makes low free-tier token budgets run out. The UI still receives
+ * the full rows via surface(); only the model sees this leaner shape.
+ */
+export function toAgentRow(row: Record<string, unknown>): Record<string, unknown> {
+  const plot = row?.plot === null || row?.plot === undefined ? null : String(row.plot);
+  return {
+    id: row?.id,
+    movie_name: row?.movie_name,
+    release_year: row?.release_year ?? null,
+    rating: row?.rating ?? null,
+    runtime: row?.runtime ?? null,
+    genre: row?.genre ?? null,
+    plot: plot
+      ? plot.length > PLOT_SNIPPET_CHARS
+        ? `${plot.slice(0, PLOT_SNIPPET_CHARS).trimEnd()}\u2026`
+        : plot
+      : null,
+  };
+}
+
 /** Trim a tool result row down to the fields the chat UI needs. */
 function toChatMovie(row: Record<string, unknown>): ChatMovie | undefined {
   // Tolerate string/numeric ids: pg returns bigint columns as strings.
@@ -152,8 +184,10 @@ export function buildChatTools(
           skip: 0,
           limit: params.limit ?? 10,
         });
+        // UI cards keep full rows (poster etc.); the model gets the lean shape.
         surface(results);
-        return { content: [{ type: "text" as const, text: JSON.stringify({ results, total }) }], details: {} };
+        const compact = results.map((r) => toAgentRow(r as unknown as Record<string, unknown>));
+        return { content: [{ type: "text" as const, text: JSON.stringify({ results: compact, total }) }], details: {} };
       },
     }),
     defineTool({
@@ -167,7 +201,11 @@ export function buildChatTools(
       execute: async (_id, params) => {
         const result = await semanticService.semanticSearch(db, { query: params.query, limit: params.limit ?? 10 }, embed);
         surface(result);
-        return { content: [{ type: "text" as const, text: JSON.stringify(result) }], details: {} };
+        const lean = {
+          ...result,
+          movies: (result.movies ?? []).map((m) => toAgentRow(m as unknown as Record<string, unknown>)),
+        };
+        return { content: [{ type: "text" as const, text: JSON.stringify(lean) }], details: {} };
       },
     }),
     defineTool({
@@ -192,7 +230,11 @@ export function buildChatTools(
           embed,
         );
         surface(result);
-        return { content: [{ type: "text" as const, text: JSON.stringify(result) }], details: {} };
+        const leanHybrid = {
+          ...result,
+          movies: (result.movies ?? []).map((m) => toAgentRow(m as unknown as Record<string, unknown>)),
+        };
+        return { content: [{ type: "text" as const, text: JSON.stringify(leanHybrid) }], details: {} };
       },
     }),
     defineTool({

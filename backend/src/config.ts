@@ -48,21 +48,39 @@ export const config = {
      * Command Code models, cheapest-capable first, so the agent never
      * silently lands on a premium model.
      */
+    /**
+     * Ordered fallbacks, tried after PI_MODEL.
+     *
+     * Grouped cheapest/free-capable first, then cheap paid, then the Command
+     * Code provider. Pi reads each provider's key from the environment
+     * (GROQ_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY, DEEPSEEK_API_KEY,
+     * COMMAND_CODE_API_KEY), and providers with no key simply do not appear in
+     * the available list, so listing several costs nothing. Chat also retries
+     * with the next candidate when a run produces no output — which is how a
+     * free tier running out degrades instead of breaking.
+     */
     modelFallbacks: process.env.AGENT_MODEL_FALLBACKS
       ? parseList(process.env.AGENT_MODEL_FALLBACKS)
       : [
-          // Free models first, in verified-working order. NOTE: getAvailable()
-          // only checks auth, not upstream health, so a free model that is
-          // present but broken upstream would be selected and then fail at
-          // request time — keep a known-good model ahead of a flaky one.
+          // Groq: fast (300-1,000+ tok/s) and every model supports local tool
+          // use. Free tier is 1K req/day but only 200K tokens/day and 8K TPM,
+          // so the token caps bite before the request cap does.
+          "groq/openai/gpt-oss-120b",
+          "groq/llama-3.3-70b-versatile",
+          // OpenRouter free models (17 tool-capable; 50 req/day free, 1,000/day
+          // once $10 of credit is on the account). Large context helps here.
+          "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+          "openrouter/poolside/laguna-s-2.1:free",
+          "openrouter/google/gemma-4-31b-it:free",
+          // Command Code free models, then its cheap paid ones.
           "commandcode/meituan/LongCat-2.0:free",
           "commandcode/inclusionai/ling-3.0-flash-sante:free",
           "commandcode/poolside/laguna-s-2.1-free",
-          // Then cheap paid models, as a reliable escape hatch.
           "commandcode/deepseek/deepseek-v4-flash",
-          "commandcode/xiaomi/mimo-v2.5",
-          "commandcode/z-ai/glm-5.3-flash",
-          "commandcode/Qwen/Qwen3.8-Flash",
+          // Direct providers, cheap and reliable.
+          "deepseek/deepseek-v4-flash",
+          "cerebras/gpt-oss-120b",
+          "google/gemini-2.5-flash-lite",
         ],
     /** Override the bundled pi-agent/models.json location. */
     modelsPath: process.env.PI_MODELS_PATH ?? undefined,

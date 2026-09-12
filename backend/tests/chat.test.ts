@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildChatTools, extractMovieRows } from "../src/agent/chat.js";
+import { buildChatTools, extractMovieRows, toAgentRow } from "../src/agent/chat.js";
 
 /**
  * Regression guard for a bug that only showed up live: `structuralService`
@@ -88,5 +88,70 @@ describe("buildChatTools movie surfacing", () => {
     const tools = buildChatTools(fakeDb([row]), async () => []);
     const tool = tools.find((t) => t.name === "search_movies")!;
     await expect(run(tool, { limit: 5 })).resolves.toBeTruthy();
+  });
+});
+
+describe("toAgentRow", () => {
+  const full = {
+    id: 1,
+    movie_name: "Alien",
+    release_year: 1979,
+    rating: 8.5,
+    runtime: 117,
+    genre: "Horror, Sci-Fi",
+    plot: "x".repeat(500),
+    directors: "Ridley Scott",
+    stars: "Sigourney Weaver",
+    votes: "1.2M",
+    gross: "80.9M",
+    poster_url: "https://example.com/a.jpg",
+    similarity_score: 0.9,
+  };
+
+  it("drops the fields an agent does not need to decide", () => {
+    const row = toAgentRow(full);
+    for (const dropped of ["directors", "stars", "votes", "gross", "poster_url", "similarity_score"]) {
+      expect(row).not.toHaveProperty(dropped);
+    }
+  });
+
+  it("keeps the deciding fields", () => {
+    expect(toAgentRow(full)).toMatchObject({
+      id: 1,
+      movie_name: "Alien",
+      release_year: 1979,
+      rating: 8.5,
+      runtime: 117,
+      genre: "Horror, Sci-Fi",
+    });
+  });
+
+  it("truncates long plots to a gist", () => {
+    const plot = toAgentRow(full).plot as string;
+    expect(plot.length).toBeLessThanOrEqual(201);
+    expect(plot.endsWith("\u2026")).toBe(true);
+  });
+
+  it("keeps short plots intact", () => {
+    expect(toAgentRow({ ...full, plot: "A short one." }).plot).toBe("A short one.");
+  });
+
+  it("tolerates missing and null fields", () => {
+    expect(toAgentRow({ id: 2, movie_name: "X", plot: null })).toMatchObject({
+      id: 2,
+      movie_name: "X",
+      release_year: null,
+      rating: null,
+      runtime: null,
+      genre: null,
+      plot: null,
+    });
+  });
+
+  it("materially shrinks a search payload", () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({ ...full, id: i }));
+    const before = JSON.stringify(rows).length;
+    const after = JSON.stringify(rows.map((r) => toAgentRow(r))).length;
+    expect(after).toBeLessThan(before * 0.6);
   });
 });
