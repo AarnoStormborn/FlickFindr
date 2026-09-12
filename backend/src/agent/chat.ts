@@ -10,12 +10,41 @@ import { logger } from "../logger.js";
 import type { Queryable } from "../models.js";
 import { structuralService } from "../services/structural.js";
 import { semanticService } from "../services/semantic.js";
-import { getModelRuntime } from "./runtime.js";
+import { getModelRuntime, resolveAgentModel } from "./runtime.js";
 
 export interface ChatSessionCallbacks {
   onDelta: (text: string) => void;
+  /** Movies surfaced by the agent's search tools, for rendering as cards. */
+  onMovies?: (movies: ChatMovie[]) => void;
   onError?: (message: string) => void;
   onDone?: () => void;
+}
+
+/** The subset of a movie row the chat UI renders as a card. */
+export interface ChatMovie {
+  id: number;
+  movie_name: string;
+  release_year: number | null;
+  rating: number | null;
+  runtime: number | null;
+  genre: string | null;
+  poster_url: string | null;
+}
+
+/** Trim a tool result row down to the fields the chat UI needs. */
+function toChatMovie(row: Record<string, unknown>): ChatMovie | undefined {
+  if (typeof row?.id !== "number") return undefined;
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
+  return {
+    id: row.id,
+    movie_name: String(row.movie_name ?? ""),
+    release_year: num(row.release_year),
+    rating: num(row.rating),
+    runtime: num(row.runtime),
+    genre: str(row.genre),
+    poster_url: str(row.poster_url),
+  };
 }
 
 export interface ChatRunner {
@@ -29,7 +58,20 @@ Use the provided tools to search the catalog (structural, semantic, hybrid), fet
 and list genres or stats. Be concise and friendly. When you recommend a movie, mention why it
 matches the user's request. If a tool errors or returns nothing, say so plainly.`;
 
-export function buildChatTools(db: Queryable, embed: (text: string) => Promise<number[]>) {
+export function buildChatTools(
+  db: Queryable,
+  embed: (text: string) => Promise<number[]>,
+  surfaceMovies?: (movies: ChatMovie[]) => void,
+) {
+  /** Report whatever a search tool found so the UI can show real cards. */
+  const surface = (rows: unknown) => {
+    if (!surfaceMovies || !Array.isArray(rows)) return;
+    const movies = rows
+      .map((r) => toChatMovie(r as Record<string, unknown>))
+      .filter((m): m is ChatMovie => m !== undefined);
+    if (movies.length) surfaceMovies(movies);
+  };
+
   return [
     defineTool({
       name: "search_movies",
@@ -66,6 +108,7 @@ export function buildChatTools(db: Queryable, embed: (text: string) => Promise<n
           skip: 0,
           limit: params.limit ?? 10,
         });
+        surface(results);
         return { content: [{ type: "text" as const, text: JSON.stringify({ results, total }) }], details: {} };
       },
     }),
@@ -79,6 +122,7 @@ export function buildChatTools(db: Queryable, embed: (text: string) => Promise<n
       }),
       execute: async (_id, params) => {
         const result = await semanticService.semanticSearch(db, { query: params.query, limit: params.limit ?? 10 }, embed);
+        surface((result as { results?: unknown }).results);
         return { content: [{ type: "text" as const, text: JSON.stringify(result) }], details: {} };
       },
     }),
@@ -103,6 +147,7 @@ export function buildChatTools(db: Queryable, embed: (text: string) => Promise<n
           { query: params.query, limit: params.limit ?? 10, genre: params.genre, directors: params.directors, stars: params.stars, min_rating: params.min_rating, max_rating: params.max_rating, min_runtime: params.min_runtime, max_runtime: params.max_runtime },
           embed,
         );
+        surface((result as { results?: unknown }).results);
         return { content: [{ type: "text" as const, text: JSON.stringify(result) }], details: {} };
       },
     }),
@@ -141,7 +186,21 @@ export function buildChatTools(db: Queryable, embed: (text: string) => Promise<n
 
 export async function createChatRunner(db: Queryable, embed: (text: string) => Promise<number[]>, callbacks: ChatSessionCallbacks): Promise<ChatRunner> {
   const modelRuntime = await getModelRuntime();
-  const tools = buildChatTools(db, embed);
+  const model = await resolveAgentModel();
+
+  // Collect movies across every tool call in this turn, de-duplicated, so a
+  // multi-tool reply yields one clean card row rather than repeats.
+  const seen = new Set<number>();
+  const collected: ChatMovie[] = [];
+  const onMovies = (movies: ChatMovie[]) => {
+    const fresh = movies.filter((m) => !seen.has(m.id));
+    if (!fresh.length) return;
+    for (const m of fresh) seen.add(m.id);
+    collected.push(...fresh);
+    callbacks.onMovies?.(collected.slice(0, 12));
+  };
+
+  const tools = buildChatTools(db, embed, onMovies);
   const toolNames = tools.map((t) => t.name);
 
   const resourceLoader = new DefaultResourceLoader({
@@ -156,6 +215,9 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
 
   const { session } = await createAgentSession({
     modelRuntime,
+    // Pass the model explicitly: omitting it falls back to "first available",
+    // which over a 69-model catalog can silently select a premium model.
+    ...(model ? { model } : {}),
     resourceLoader,
     sessionManager: SessionManager.inMemory(),
     thinkingLevel: "medium",

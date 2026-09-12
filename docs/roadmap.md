@@ -58,6 +58,7 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 | **Discovery shelves** | `frontend/src/data/shelves.js` | Latest / Going Retro / Millennium + curated genre rows, with vote floors |
 | **Cinematic redesign** | `docs/FRONTEND_DESIGN_INSPIRATION.md` | Dark editorial palette, Bodoni/Inter, floating nav |
 | **Playful loading quips** | `frontend/src/components/LoadingQuips.jsx` | Two tiers; escalates at 6s to acknowledge Render cold starts |
+| **Concierge chat UI** | `frontend/src/pages/ChatPage.jsx`, `frontend/src/api/chat.js` | Streaming SSE chat at `/chat`; agent tool results render as movie cards |
 | **Infra** | `docs/workflow.md`, `deploy/`, `.github/workflows/` | feature → dev → main, main guard, path-aware CI/deploys, trailer timer |
 | **Tests** | `backend/tests`, `frontend/src/**/*.test.*` | 21 backend + 35 frontend; `npm audit` clean in both packages |
 
@@ -84,12 +85,17 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 - For describe-the-plot searches, show *why* each result matched (matched plot
   snippet + similarity) — builds trust in the differentiator.
 
-### Conversational concierge (the wedge)
-- `POST /chat` (SSE) **already exists** in the backend with catalog tools, but
-  there is **no UI**, and the agent has **no model credentials on Render** so it
-  silently falls back to plain search.
-- Blocked on a decision: which model to pin (`PI_MODEL`) and how the API host
-  authenticates. Once settled: enable the agent in prod, then build the chat UI.
+### Conversational concierge (the wedge) — *UI built, needs a key*
+- `POST /chat` (SSE) streams the agent's reply **and the movies its tools found**,
+  which render as clickable cards; frontend page at `/chat` ("Concierge" in the
+  nav).
+- The agent's provider is configured in `backend/pi-agent/models.json`. Model
+  choice is explicit (free model first, never the SDK's "first available").
+- **Remaining:** set `COMMAND_CODE_API_KEY` on Render. The Command Code
+  *Provider API* needs a paid plan — the $1 Go plan is API-blocked
+  (`403 upgrade_required`); GOAT ($10/mo) is the cheapest with API access, and
+  the free models then cost $0 per token. Alternative providers (a Gemini/
+  Groq/OpenRouter-free key) need only a new entry in `models.json`.
 
 ---
 

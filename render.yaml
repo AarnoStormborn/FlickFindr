@@ -5,11 +5,13 @@
 # from this repo in Render, or copy the service config manually.
 #
 # Secrets/env to set in Render (Dashboard -> your service -> Environment):
-#   DATABASE_URL      — Supabase connection string (postgres://...)
-#   CORS_ORIGINS      — your Vercel app URL(s)
-#   AGENT_ENABLED     — true/false
-#   PI_MODEL          — optional cheapest model id
-#   TMDB_API_KEY      — optional
+#   DATABASE_URL           — Supabase connection string (postgres://...)
+#   CORS_ORIGINS           — your Vercel app URL(s)
+#   AGENT_ENABLED          — true/false
+#   COMMAND_CODE_API_KEY   — enables the concierge agent (see backend/pi-agent/models.json)
+#   PI_MODEL               — optional: pin one model id (provider/id)
+#   AGENT_MODEL_FALLBACKS  — optional: comma-separated ordered fallbacks
+#   TMDB_API_KEY           — optional
 
 services:
   - type: web
@@ -45,7 +47,13 @@ services:
         sync: false
       - key: AGENT_ENABLED
         sync: false
+      # Enables the agent. Without it the concierge reports that it is not
+      # configured and search silently uses the raw query.
+      - key: COMMAND_CODE_API_KEY
+        sync: false
       - key: PI_MODEL
+        sync: false
+      - key: AGENT_MODEL_FALLBACKS
         sync: false
       - key: TMDB_API_KEY
         sync: false

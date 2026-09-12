@@ -1,0 +1,291 @@
+.chat-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--navbar-height));
+    margin-top: var(--navbar-height);
+    max-width: 1080px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 var(--space-lg);
+}
+
+/* ---------- Header ---------- */
+
+.chat-header {
+    padding: var(--space-lg) 0 var(--space-md);
+    border-bottom: 1px solid var(--line-subtle);
+}
+
+.chat-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.chat-title em {
+    font-style: italic;
+    color: var(--accent-gold);
+}
+
+.chat-subtitle {
+    margin: var(--space-xs) 0 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+/* ---------- Scrolling transcript ---------- */
+
+.chat-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-lg) 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-hover) transparent;
+}
+
+.chat-empty {
+    margin: auto 0;
+    text-align: center;
+}
+
+.chat-empty-lead {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-md);
+}
+
+.chat-suggestions {
+    list-style: none;
+    padding: 0;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    max-width: 560px;
+}
+
+.chat-chip {
+    width: 100%;
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-card);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--card-radius);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), color var(--transition-fast),
+        background var(--transition-fast);
+}
+
+.chat-chip:hover {
+    border-color: var(--accent-gold);
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+/* ---------- Turns ---------- */
+
+.chat-turn {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    animation: chat-fade-in var(--transition-normal);
+}
+
+.chat-turn-user {
+    align-items: flex-end;
+}
+
+@keyframes chat-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.chat-bubble {
+    max-width: 78%;
+    padding: var(--space-md) var(--space-lg);
+    border-radius: var(--card-radius-lg);
+    line-height: 1.6;
+}
+
+.chat-bubble-user {
+    background: var(--accent-gold-soft);
+    border: 1px solid rgba(217, 164, 65, 0.35);
+    color: var(--text-primary);
+}
+
+.chat-bubble-assistant {
+    background: var(--bg-card);
+    border: 1px solid var(--line-subtle);
+    color: var(--text-primary);
+}
+
+.chat-text {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: var(--font-size-base);
+}
+
+/* ---------- Result cards ---------- */
+
+.chat-movies {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--gutter-grid);
+    padding-top: var(--space-xs);
+}
+
+.chat-movie {
+    min-width: 0;
+}
+
+/* ---------- Typing indicator ---------- */
+
+.chat-typing {
+    display: flex;
+    gap: 5px;
+    padding-left: var(--space-lg);
+}
+
+.chat-typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-gold);
+    opacity: 0.5;
+    animation: chat-bounce 1.1s infinite ease-in-out;
+}
+
+.chat-typing span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.chat-typing span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes chat-bounce {
+    0%,
+    60%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+    30% {
+        transform: translateY(-4px);
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chat-turn,
+    .chat-typing span {
+        animation: none;
+    }
+}
+
+/* ---------- Errors ---------- */
+
+.chat-error {
+    padding: var(--space-md);
+    border-radius: var(--card-radius);
+    background: rgba(200, 70, 70, 0.12);
+    border: 1px solid rgba(200, 70, 70, 0.4);
+    color: #f0c9c9;
+    font-size: var(--font-size-sm);
+}
+
+/* ---------- Composer ---------- */
+
+.chat-composer {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: flex-end;
+    padding: var(--space-md) 0 var(--space-2xl);
+    border-top: 1px solid var(--line-subtle);
+}
+
+.chat-input {
+    flex: 1;
+    resize: none;
+    min-height: 48px;
+    max-height: 160px;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--card-radius);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    line-height: 1.5;
+    transition: border-color var(--transition-fast);
+}
+
+.chat-input:focus {
+    outline: none;
+    border-color: var(--accent-gold);
+}
+
+.chat-input:disabled {
+    opacity: 0.6;
+}
+
+.chat-send {
+    height: 48px;
+    padding: 0 var(--space-lg);
+    border: none;
+    border-radius: var(--card-radius);
+    background: var(--accent-gradient);
+    color: #1a1408;
+    font-family: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.chat-send:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.chat-send:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.chat-stop {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--line-subtle);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 640px) {
+    .chat-page {
+        padding: 0 var(--space-md);
+    }
+
+    .chat-bubble {
+        max-width: 92%;
+    }
+
+    .chat-movies {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}

@@ -1,0 +1,66 @@
+{
+  "providers": {
+    "commandcode": {
+      "name": "Command Code",
+      "baseUrl": "https://api.commandcode.ai/provider/v1",
+      "api": "openai-completions",
+      "apiKey": "$COMMAND_CODE_API_KEY",
+      "models": [
+        {
+          "id": "poolside/laguna-s-2.1-free",
+          "name": "Laguna S 2.1 (free)",
+          "contextWindow": 256000,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "deepseek/deepseek-v4-flash",
+          "name": "DeepSeek V4 Flash",
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0.3, "output": 1.2, "cacheRead": 0.006, "cacheWrite": 0 }
+        },
+        {
+          "id": "xiaomi/mimo-v2.5",
+          "name": "MiMo V2.5",
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0.14, "output": 0.28, "cacheRead": 0.0028, "cacheWrite": 0 }
+        },
+        {
+          "id": "z-ai/glm-5.3-flash",
+          "name": "GLM-5.3 Flash",
+          "contextWindow": 1048576,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0.15, "output": 0.5, "cacheRead": 0.03, "cacheWrite": 0 }
+        },
+        {
+          "id": "Qwen/Qwen3.8-Flash",
+          "name": "Qwen 3.8 Flash",
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0.16, "output": 0.47, "cacheRead": 0.016, "cacheWrite": 0 }
+        },
+        {
+          "id": "google/gemini-3.5-flash-lite",
+          "name": "Gemini 3.5 Flash Lite",
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0.3, "output": 2.5, "cacheRead": 0.03, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}

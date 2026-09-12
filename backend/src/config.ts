@@ -12,6 +12,13 @@ function parseCorsOrigins(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function parseList(raw: string | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 const db = {
   host: process.env.DB_HOST ?? "localhost",
   port: Number(process.env.DB_PORT ?? 5433),
@@ -36,6 +43,22 @@ export const config = {
   agent: {
     enabled: (process.env.AGENT_ENABLED ?? "true") !== "false",
     model: process.env.PI_MODEL ?? undefined,
+    /**
+     * Ordered fallbacks, tried after PI_MODEL. Defaults to the free/cheap
+     * Command Code models, cheapest-capable first, so the agent never
+     * silently lands on a premium model.
+     */
+    modelFallbacks: process.env.AGENT_MODEL_FALLBACKS
+      ? parseList(process.env.AGENT_MODEL_FALLBACKS)
+      : [
+          "commandcode/poolside/laguna-s-2.1-free",
+          "commandcode/deepseek/deepseek-v4-flash",
+          "commandcode/xiaomi/mimo-v2.5",
+          "commandcode/z-ai/glm-5.3-flash",
+          "commandcode/Qwen/Qwen3.8-Flash",
+        ],
+    /** Override the bundled pi-agent/models.json location. */
+    modelsPath: process.env.PI_MODELS_PATH ?? undefined,
     queryTimeoutMs: Number(process.env.AGENT_QUERY_TIMEOUT_MS ?? 30_000),
     chatTimeoutMs: Number(process.env.CHAT_TIMEOUT_MS ?? 120_000),
   },
