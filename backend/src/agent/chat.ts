@@ -10,7 +10,7 @@ import { logger } from "../logger.js";
 import type { Queryable } from "../models.js";
 import { structuralService, MOVIE_COLUMNS } from "../services/structural.js";
 import { semanticService } from "../services/semantic.js";
-import { getModelRuntime, resolveAgentModel } from "./runtime.js";
+import { getModelRuntime, resolveAgentModelCandidates } from "./runtime.js";
 
 export interface ChatSessionCallbacks {
   onDelta: (text: string) => void;
@@ -248,7 +248,6 @@ export function buildChatTools(
 
 export async function createChatRunner(db: Queryable, embed: (text: string) => Promise<number[]>, callbacks: ChatSessionCallbacks): Promise<ChatRunner> {
   const modelRuntime = await getModelRuntime();
-  const model = await resolveAgentModel();
 
   /**
    * The agent's own picks. These accumulate across show_movies calls (models
@@ -295,60 +294,114 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
   });
   await resourceLoader.reload();
 
-  const { session } = await createAgentSession({
-    modelRuntime,
-    // Pass the model explicitly: omitting it falls back to "first available",
-    // which over a 69-model catalog can silently select a premium model.
-    ...(model ? { model } : {}),
-    resourceLoader,
-    sessionManager: SessionManager.inMemory(),
-    thinkingLevel: "medium",
-    tools: toolNames,
-    customTools: tools,
-  });
+  /**
+   * Build one session bound to a specific model, tracking whether it produced
+   * anything. Free models can be exhausted ("used all 100 free requests") or
+   * silently return nothing, so the caller needs to know when a run was empty.
+   */
+  async function startSession(model?: (typeof candidates)[number]) {
+    // The agent narrates while working ("Let me search for...") and then
+    // repeats itself in the real answer, so a naive stream shows the same
+    // sentence twice. Narration is discarded only once real replacement text
+    // starts arriving — resetting eagerly would leave the user with an empty
+    // reply whenever the model's final message turns out to be blank.
+    let textBlocks = 0;
+    let sawToolCall = false;
+    let pendingReset = false;
+    let produced = false;
 
-  // The agent narrates while working ("Let me search for...") and then repeats
-  // itself in the real answer, so a naive stream shows the same sentence twice.
-  // Text produced before a tool call is discarded; only what comes after the
-  // last tool call is kept.
-  let textBlocks = 0;
-  let sawToolCall = false;
-  const unsubscribe = session.subscribe((event) => {
-    if (event.type === "tool_execution_start") {
-      sawToolCall = true;
-      return;
-    }
-    if (event.type !== "message_update") return;
-    const ev = event.assistantMessageEvent;
-    if (ev.type === "text_start") {
-      if (sawToolCall) {
-        sawToolCall = false;
-        textBlocks = 0;
-        callbacks.onReset?.();
+    const { session } = await createAgentSession({
+      modelRuntime,
+      // Pass the model explicitly: omitting it falls back to "first available",
+      // which over a 69-model catalog can silently select a premium model.
+      ...(model ? { model } : {}),
+      resourceLoader,
+      sessionManager: SessionManager.inMemory(),
+      thinkingLevel: "medium",
+      tools: toolNames,
+      customTools: tools,
+    });
+
+    const unsubscribe = session.subscribe((event) => {
+      if (event.type === "tool_execution_start") {
+        sawToolCall = true;
+        produced = true;
+        return;
       }
-      textBlocks += 1;
-      if (textBlocks > 1) callbacks.onDelta("\n\n");
-    } else if (ev.type === "text_delta") {
-      callbacks.onDelta(ev.delta);
-    }
-  });
+      if (event.type !== "message_update") return;
+      const ev = event.assistantMessageEvent;
+      if (ev.type === "text_start") {
+        if (sawToolCall) {
+          sawToolCall = false;
+          textBlocks = 0;
+          pendingReset = true;
+        }
+        textBlocks += 1;
+        if (textBlocks > 1) callbacks.onDelta("\n\n");
+      } else if (ev.type === "text_delta") {
+        if (pendingReset) {
+          pendingReset = false;
+          callbacks.onReset?.();
+        }
+        produced = true;
+        callbacks.onDelta(ev.delta);
+      }
+    });
 
-  logger.info({ tools: toolNames }, "Chat agent session created");
+    return { session, unsubscribe, produced: () => produced };
+  }
+
+  const candidates = await resolveAgentModelCandidates();
+  logger.info({ tools: toolNames, candidates: candidates.length }, "Chat agent session created");
+  let active = await startSession(candidates[0]);
 
   return {
     async run(message: string, history: { role: "user" | "assistant"; content: string }[] = []) {
       const composite = history.length
         ? `${history.map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`).join("\n")}\n\nUser: ${message}`
         : message;
-      await session.prompt(composite);
-      callbacks.onDone?.();
+
+      // Cap attempts: each one may bill against a paid model, and a
+      // persistently broken request should fail rather than burn quota.
+      const attempts = Math.min(candidates.length, 3) || 1;
+      let lastError: unknown;
+
+      for (let i = 0; i < attempts; i++) {
+        if (i > 0) {
+          const next = candidates[i];
+          logger.warn(
+            { model: next ? `${next.provider}/${next.id}` : "default" },
+            "Retrying chat with the next model",
+          );
+          callbacks.onReset?.();
+          active.unsubscribe();
+          active.session.dispose();
+          active = await startSession(next);
+        }
+        try {
+          await active.session.prompt(composite);
+          if (active.produced()) {
+            callbacks.onDone?.();
+            return;
+          }
+          // No text and no tool calls: typically an exhausted free-model
+          // quota, which the provider reports as an empty completion.
+          lastError = new Error("The model returned nothing");
+          logger.warn({ attempt: i }, "Agent produced no output");
+        } catch (err) {
+          lastError = err;
+          logger.warn({ err, attempt: i }, "Agent run failed");
+        }
+      }
+
+      throw lastError instanceof Error ? lastError : new Error("The agent produced no response");
     },
     async abort() {
-      await session.abort();
+      await active.session.abort();
     },
     dispose() {
-      unsubscribe();
-      session.dispose();
+      active.unsubscribe();
+      active.session.dispose();
     },
   };
 }

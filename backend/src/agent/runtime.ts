@@ -109,6 +109,57 @@ export function chooseModel<T extends { provider: string; id: string; cost?: { i
 }
 
 /**
+ * Ordered list of usable models: the configured preference order, filtered to
+ * those actually available, plus any other authenticated model as a last
+ * resort. Lets a caller retry with the next model when one is rate-limited or
+ * out of free quota.
+ */
+export async function resolveAgentModelCandidates(): Promise<AvailableModel[]> {
+  try {
+    const runtime = await getModelRuntime();
+    const available = await runtime.getAvailable();
+    if (available.length === 0) return [];
+
+    const wanted = [config.agent.model, ...config.agent.modelFallbacks].filter(
+      (m): m is string => typeof m === "string" && m.trim().length > 0,
+    );
+
+    const ordered: AvailableModel[] = [];
+    const seen = new Set<string>();
+    const push = (m: AvailableModel) => {
+      const k = keyOf(m);
+      if (seen.has(k)) return;
+      seen.add(k);
+      ordered.push(m);
+    };
+
+    for (const want of wanted) {
+      const needle = want.trim().toLowerCase();
+      const exact = available.find((m) => keyOf(m) === needle);
+      if (exact) {
+        push(exact);
+        continue;
+      }
+      const partial = available.find((m) => keyOf(m).includes(needle));
+      if (partial) push(partial);
+    }
+    // Remaining authenticated models, cheapest first, as fallbacks.
+    for (const m of [...available].sort(byCost())) push(m);
+
+    return ordered;
+  } catch (err) {
+    logger.error({ err }, "Failed to resolve agent model candidates");
+    return [];
+  }
+}
+
+/** Cheapest first, then alphabetical — deterministic ordering. */
+function byCost() {
+  const cost = (m: AvailableModel) => Number(m.cost?.input ?? 0) + Number(m.cost?.output ?? 0);
+  return (a: AvailableModel, b: AvailableModel) => cost(a) - cost(b) || keyOf(a).localeCompare(keyOf(b));
+}
+
+/**
  * Resolve the model the agent should use. Explicit and ordered:
  *
  *   1. `PI_MODEL` (exact `provider/id`, else a substring match)
@@ -119,33 +170,9 @@ export function chooseModel<T extends { provider: string; id: string; cost?: { i
  * catalogs mix free models with $50/M flagships, so "first available" can be a
  * very expensive default to land on silently.
  */
+/** The single preferred model (first usable candidate). */
 export async function resolveAgentModel(): Promise<AvailableModel | undefined> {
-  try {
-    const runtime = await getModelRuntime();
-    const available = [...(await runtime.getAvailable())];
-    if (available.length === 0) {
-      logger.warn("No authenticated models available; agent features will fall back");
-      return undefined;
-    }
-
-    const wanted = [config.agent.model, ...config.agent.modelFallbacks].filter(
-      (m): m is string => typeof m === "string" && m.trim().length > 0,
-    );
-
-    const chosen = chooseModel(available, wanted);
-    if (chosen && wanted.some((w) => keyOf(chosen).includes(w.trim().toLowerCase()))) {
-      logger.info({ model: keyOf(chosen) }, "Agent model resolved");
-    } else if (chosen) {
-      logger.warn(
-        { model: keyOf(chosen), candidates: wanted },
-        "No configured model matched; using the cheapest authenticated model",
-      );
-    }
-    return chosen;
-  } catch (err) {
-    logger.error({ err }, "Failed to resolve agent model");
-    return undefined;
-  }
+  return (await resolveAgentModelCandidates())[0];
 }
 
 /** Agent features are usable when at least one model is authenticated. */
