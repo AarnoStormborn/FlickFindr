@@ -50,7 +50,12 @@ export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (
     }
 
     const raw = reply.raw;
+    // NOTE: writeHead() *replaces* the whole header set, which would discard
+    // the CORS headers the @fastify/cors hook already put on the reply —
+    // breaking the chat for any cross-origin frontend (e.g. Vercel -> Render)
+    // even though same-origin and curl requests still work. Carry them over.
     raw.writeHead(200, {
+      ...(reply.getHeaders() as Record<string, string | number | string[]>),
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
@@ -84,6 +89,7 @@ export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (
     try {
       runner = await createChatRunner(db, embed, {
         onDelta: (delta) => send({ delta }),
+        onReset: () => send({ reset: true }),
         onMovies: (movies) => send({ movies }),
         onError: (message) => send({ error: message }),
         onDone: () => send({ done: true }),

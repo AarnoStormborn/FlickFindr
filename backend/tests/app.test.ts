@@ -154,4 +154,19 @@ describe("FlickFindr API (injected deps)", () => {
     const body = res.json();
     expect(Array.isArray(body.results)).toBe(true);
   });
+
+  it("POST /chat keeps the CORS headers on the SSE response", async () => {
+    // The SSE route writes headers via reply.raw.writeHead(), which replaces
+    // the whole header set. Without carrying over what @fastify/cors set, the
+    // chat works from curl and same-origin but is blocked by the browser for
+    // any cross-origin frontend (Vercel -> Render) — a production-only break.
+    const res = await app.inject({
+      method: "POST",
+      url: "/chat",
+      headers: { origin: "http://localhost:5173" },
+      payload: { message: "hi" },
+    });
+    expect(res.headers["content-type"]).toContain("text/event-stream");
+    expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+  });
 });

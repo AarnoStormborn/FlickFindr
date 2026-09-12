@@ -30,11 +30,12 @@ function parseFrame(frame) {
  * @param {Array}  [options.history]     prior {role, content} turns
  * @param {AbortSignal} [options.signal] abort the request
  * @param {(text: string) => void} [options.onDelta]   incremental assistant text
+ * @param {() => void} [options.onReset]              discard streamed text so far
  * @param {(movies: Array) => void} [options.onMovies] movies found by the agent
  * @param {(message: string) => void} [options.onError] error text from the stream
  * @returns {Promise<void>} resolves when the stream ends
  */
-export async function streamChat({ message, history = [], signal, onDelta, onMovies, onError }) {
+export async function streamChat({ message, history = [], signal, onDelta, onReset, onMovies, onError }) {
     const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +75,8 @@ export async function streamChat({ message, history = [], signal, onDelta, onMov
 
                 const payload = parseFrame(frame);
                 if (payload) {
+                    // The agent discards narration it emitted before a tool call.
+                    if (payload.reset === true) onReset?.();
                     if (typeof payload.delta === 'string') onDelta?.(payload.delta);
                     if (Array.isArray(payload.movies)) onMovies?.(payload.movies);
                     if (payload.error) onError?.(String(payload.error));

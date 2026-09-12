@@ -51,7 +51,14 @@ export const config = {
     modelFallbacks: process.env.AGENT_MODEL_FALLBACKS
       ? parseList(process.env.AGENT_MODEL_FALLBACKS)
       : [
+          // Free models first, in verified-working order. NOTE: getAvailable()
+          // only checks auth, not upstream health, so a free model that is
+          // present but broken upstream would be selected and then fail at
+          // request time — keep a known-good model ahead of a flaky one.
+          "commandcode/meituan/LongCat-2.0:free",
+          "commandcode/inclusionai/ling-3.0-flash-sante:free",
           "commandcode/poolside/laguna-s-2.1-free",
+          // Then cheap paid models, as a reliable escape hatch.
           "commandcode/deepseek/deepseek-v4-flash",
           "commandcode/xiaomi/mimo-v2.5",
           "commandcode/z-ai/glm-5.3-flash",

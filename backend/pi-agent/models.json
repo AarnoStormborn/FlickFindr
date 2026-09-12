@@ -7,6 +7,24 @@
       "apiKey": "$COMMAND_CODE_API_KEY",
       "models": [
         {
+          "id": "meituan/LongCat-2.0:free",
+          "name": "LongCat 2.0 (free)",
+          "contextWindow": 1000000,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "inclusionai/ling-3.0-flash-sante:free",
+          "name": "Ling 3.0 Flash (free)",
+          "contextWindow": 256000,
+          "maxTokens": 16384,
+          "input": ["text"],
+          "reasoning": false,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
           "id": "poolside/laguna-s-2.1-free",
           "name": "Laguna S 2.1 (free)",
           "contextWindow": 256000,

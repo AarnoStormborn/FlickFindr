@@ -134,13 +134,6 @@
     color: var(--text-primary);
 }
 
-.chat-text {
-    margin: 0;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    font-size: var(--font-size-base);
-}
-
 /* ---------- Result cards ---------- */
 
 .chat-movies {
@@ -288,4 +281,46 @@
     .chat-movies {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
+}
+
+/* ---------- Rich text (light markdown from the model) ---------- */
+
+.chat-rich > *:first-child {
+    margin-top: 0;
+}
+
+.chat-rich > *:last-child {
+    margin-bottom: 0;
+}
+
+.chat-rich-p {
+    margin: 0 0 var(--space-sm);
+    line-height: 1.65;
+}
+
+.chat-rich-p:last-child {
+    margin-bottom: 0;
+}
+
+.chat-rich strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.chat-rich-list {
+    margin: 0 0 var(--space-sm);
+    padding-left: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.chat-rich-list li {
+    line-height: 1.6;
+}
+
+.chat-rich-rule {
+    border: 0;
+    border-top: 1px solid var(--line-subtle);
+    margin: var(--space-md) 0;
 }

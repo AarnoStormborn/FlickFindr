@@ -129,4 +129,28 @@ describe('streamChat', () => {
 
         await expect(streamChat({ message: 'hi' })).rejects.toThrow('HTTP 500');
     });
+
+    it('clears streamed text when the agent sends a reset', async () => {
+        // The agent narrates before calling tools, then discards that text.
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => streamResponse([sse({ delta: 'Let me search…' }), sse({ reset: true }), sse({ delta: 'Here you go.' })])),
+        );
+
+        let content = '';
+        const resets = [];
+        await streamChat({
+            message: 'hi',
+            onDelta: (d) => {
+                content += d;
+            },
+            onReset: () => {
+                resets.push(true);
+                content = '';
+            },
+        });
+
+        expect(resets).toHaveLength(1);
+        expect(content).toBe('Here you go.');
+    });
 });

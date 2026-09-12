@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import MovieCard from '../components/MovieCard';
 import LoadingQuips from '../components/LoadingQuips';
+import RichText from '../components/RichText';
 import { streamChat } from '../api/chat';
 import './ChatPage.css';
 
@@ -80,6 +81,7 @@ export default function ChatPage() {
                             return next;
                         }),
                     onMovies: (movies) => patchLast({ movies }),
+                    onReset: () => patchLast({ content: '' }),
                     onError: (msg) => setError(msg),
                 });
             } catch (err) {
@@ -151,7 +153,7 @@ export default function ChatPage() {
                     <div key={i} className={`chat-turn chat-turn-${msg.role}`}>
                         <div className={`chat-bubble chat-bubble-${msg.role}`}>
                             {msg.content ? (
-                                <p className="chat-text">{msg.content}</p>
+                                <RichText text={msg.content} />
                             ) : (
                                 msg.role === 'assistant' && <LoadingQuips />
                             )}
