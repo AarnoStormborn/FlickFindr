@@ -24,6 +24,11 @@ export default function Navbar() {
                         </NavLink>
                     </li>
                     <li className="navbar-item">
+                        <NavLink to="/chat" className={activeClass}>
+                            Concierge
+                        </NavLink>
+                    </li>
+                    <li className="navbar-item">
                         <NavLink to="/lists" className={activeClass}>
                             My Lists
                         </NavLink>

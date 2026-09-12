@@ -67,13 +67,22 @@ No `.env` is required at boot — config ships dev defaults matching
 
 - `AGENT_ENABLED=true` (default): `POST /search/semantic` and `/search/hybrid`
   first run the query through a Pi agent that extracts filters/intent, then
-  execute the search. `/chat` streams an assistant over SSE.
+  execute the search. `/chat` streams an assistant over SSE (consumed by the
+  frontend concierge at `/chat`).
 - Hybrid search relaxes categorical filters (genre/directors/stars) when the
   strict conjunction returns nothing, so users always get ranked results.
-- The agent uses `~/.pi/agent/auth.json` credentials via `ModelRuntime`;
-  `PI_MODEL` pins a specific model, and timeouts are configurable.
-- **Status: live-verified end-to-end** — query parsing, tool-using chat,
-  SSE streaming all confirmed against a seeded local catalog.
+- **Provider:** declared in [`pi-agent/models.json`](pi-agent/models.json) —
+  currently Command Code (OpenAI-compatible at
+  `https://api.commandcode.ai/provider/v1`). Set `COMMAND_CODE_API_KEY` and the
+  provider's models become available; without it the agent reports "not
+  configured" and search falls back to the raw query.
+- **Model choice is explicit, never accidental.** The agent resolves
+  `PI_MODEL` → `AGENT_MODEL_FALLBACKS` (default: the free Laguna model, then
+  cheap DeepSeek/MiMo/GLM/Qwen) → and only then the *cheapest* authenticated
+  model. Provider catalogs mix free models with ~$50/M flagships, so the SDK's
+  own "first available" default is not used.
+- Credentials are held in memory, not written to `auth.json`.
+- `PI_MODELS_PATH` overrides the bundled config; timeouts are configurable.
 
 ## API
 

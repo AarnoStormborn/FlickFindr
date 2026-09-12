@@ -59,10 +59,15 @@ describe("FlickFindr API (injected deps)", () => {
     await app.close();
   });
 
-  it("GET / returns health message", async () => {
+  it("GET / returns health message and agent status", async () => {
     const res = await app.inject({ method: "GET", url: "/" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ message: "API is running !!!" });
+    const body = res.json();
+    expect(body.message).toBe("API is running !!!");
+    // `configured` depends on the environment's credentials, so assert only
+    // the contract clients rely on: the field is present and boolean.
+    expect(typeof body.agent?.enabled).toBe("boolean");
+    expect(typeof body.agent?.configured).toBe("boolean");
   });
 
   it("GET /flicks/ lists movies", async () => {
