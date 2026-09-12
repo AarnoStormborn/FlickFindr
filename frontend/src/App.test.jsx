@@ -66,6 +66,14 @@ describe('App routing', () => {
     await waitFor(() => expect(document.querySelector('.genre-page')).toBeTruthy());
   });
 
+  it('renders the chat (concierge) route with prompt suggestions', async () => {
+    renderAt('/chat');
+    await waitFor(() => expect(document.querySelector('.chat-page')).toBeTruthy());
+    expect(screen.getByRole('heading', { name: /Concierge/i })).toBeInTheDocument();
+    expect(document.querySelectorAll('.chat-chip').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText(/Message the concierge/i)).toBeInTheDocument();
+  });
+
   it('renders the era route', async () => {
     renderAt('/era/retro');
     await waitFor(() => expect(document.querySelector('.genre-page')).toBeTruthy());
@@ -77,6 +85,7 @@ describe('App routing', () => {
     expect(nav).toBeTruthy();
     expect(nav).toHaveTextContent('Home');
     expect(nav).toHaveTextContent('Search');
+    expect(nav).toHaveTextContent('Concierge');
     expect(nav).toHaveTextContent('My Lists');
   });
 });

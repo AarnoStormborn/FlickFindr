@@ -4,3 +4,5 @@ dist/
 .env
 .data/
 coverage/
+# Model catalog cache written by ModelRuntime (regenerated on boot)
+pi-agent/models-store.json

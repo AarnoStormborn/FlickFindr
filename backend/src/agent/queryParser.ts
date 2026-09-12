@@ -7,7 +7,7 @@ import {
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 import { HybridSearchRequestSchema, type HybridSearchRequest } from "../models.js";
-import { getModelRuntime } from "./runtime.js";
+import { getModelRuntime, resolveAgentModel } from "./runtime.js";
 
 // In-memory agent-parse cache: repeat searches / pagination reuse intent.
 const PARSE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
@@ -127,9 +127,12 @@ async function parseSearchQueryImpl(rawQuery: string): Promise<HybridSearchReque
 
   try {
     const modelRuntime = await getModelRuntime();
+    const model = await resolveAgentModel();
     const resourceLoader = await minimalLoader();
     const result = await createAgentSession({
       modelRuntime,
+      // Explicit model: omitting it falls back to "first available".
+      ...(model ? { model } : {}),
       resourceLoader,
       sessionManager: SessionManager.inMemory(),
       thinkingLevel: "off",
