@@ -351,6 +351,7 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
     let sawToolCall = false;
     let pendingReset = false;
     let produced = false;
+    let gotText = false;
 
     const { session } = await createAgentSession({
       modelRuntime,
@@ -359,7 +360,11 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
       ...(model ? { model } : {}),
       resourceLoader,
       sessionManager: SessionManager.inMemory(),
-      thinkingLevel: "medium",
+      // "off": these models are reasoning-capable, and at higher levels they
+      // can spend the final turn on reasoning and return empty content (a
+      // silent empty reply). A movie concierge does not need deep reasoning,
+      // and skipping it is also faster and cheaper per turn.
+      thinkingLevel: "off",
       tools: toolNames,
       customTools: tools,
     });
@@ -386,11 +391,14 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
           callbacks.onReset?.();
         }
         produced = true;
+        gotText = true;
         callbacks.onDelta(ev.delta);
       }
     });
 
-    return { session, unsubscribe, produced: () => produced };
+    // `produced` covers tool activity; `gotText` is what the user can read.
+    // A run that surfaced cards but said nothing is a failure, not a result.
+    return { session, unsubscribe, produced: () => produced, gotText: () => gotText };
   }
 
   const candidates = await resolveAgentModelCandidates();
@@ -422,14 +430,15 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
         }
         try {
           await active.session.prompt(composite);
-          if (active.produced()) {
+          if (active.gotText()) {
             callbacks.onDone?.();
             return;
           }
-          // No text and no tool calls: typically an exhausted free-model
-          // quota, which the provider reports as an empty completion.
-          lastError = new Error("The model returned nothing");
-          logger.warn({ attempt: i }, "Agent produced no output");
+          // Either nothing at all (typically an exhausted free-model quota,
+          // which arrives as an empty completion) or tool calls with no
+          // explanation — both are useless to the user, so try the next model.
+          lastError = new Error("The model returned no text");
+          logger.warn({ attempt: i, hadToolCalls: active.produced() }, "Agent returned no text");
         } catch (err) {
           lastError = err;
           logger.warn({ err, attempt: i }, "Agent run failed");

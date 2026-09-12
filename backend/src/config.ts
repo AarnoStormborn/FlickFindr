@@ -62,11 +62,19 @@ export const config = {
     modelFallbacks: process.env.AGENT_MODEL_FALLBACKS
       ? parseList(process.env.AGENT_MODEL_FALLBACKS)
       : [
-          // Groq: fast (300-1,000+ tok/s) and every model supports local tool
-          // use. Free tier is 1K req/day but only 200K tokens/day and 8K TPM,
-          // so the token caps bite before the request cap does.
+          // Groq: fastest by far (300-1,000+ tok/s, ~0.3s/request). Free tier
+          // is 1K req/day but only 200K tokens/day and 8K tokens/min.
+          //
+          // Use qwen3.8-27b, NOT the gpt-oss models: gpt-oss is a reasoning
+          // model and, in a tool loop, repeatedly answered with reasoning but
+          // no content — measured 1 success in 4 turns, each failure ending
+          // silently after ~20s with cards but no text. qwen3.8-27b produced a
+          // full answer first try (also 1,048 chars + 5 cards on retest).
+          // qwen3.6-27b returns nothing at all, so pin 3.8.
+          // Only ids the account actually exposes are listed — an unavailable
+          // model costs a whole retry attempt before it fails.
+          "groq/qwen/qwen3.8-27b",
           "groq/openai/gpt-oss-120b",
-          "groq/llama-3.3-70b-versatile",
           // OpenRouter free models (17 tool-capable; 50 req/day free, 1,000/day
           // once $10 of credit is on the account). Large context helps here.
           "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
@@ -85,6 +93,12 @@ export const config = {
     /** Override the bundled pi-agent/models.json location. */
     modelsPath: process.env.PI_MODELS_PATH ?? undefined,
     queryTimeoutMs: Number(process.env.AGENT_QUERY_TIMEOUT_MS ?? 30_000),
-    chatTimeoutMs: Number(process.env.CHAT_TIMEOUT_MS ?? 120_000),
+    /**
+     * Chat can legitimately take a while: a tool loop is several model calls,
+     * and free tiers throttle per-minute tokens, so a turn can exceed two
+     * minutes (measured: 40-135s on Groq's free tier). Too low and the agent
+     * gets aborted mid-loop, which surfaces as an empty reply.
+     */
+    chatTimeoutMs: Number(process.env.CHAT_TIMEOUT_MS ?? 240_000),
   },
 } as const;

@@ -1,5 +1,17 @@
 {
   "providers": {
+    "groq": {
+      "modelOverrides": {
+        "openai/gpt-oss-120b": {
+          "reasoning": false,
+          "compat": { "supportsReasoningEffort": false }
+        },
+        "openai/gpt-oss-20b": {
+          "reasoning": false,
+          "compat": { "supportsReasoningEffort": false }
+        }
+      }
+    },
     "commandcode": {
       "name": "Command Code",
       "baseUrl": "https://api.commandcode.ai/provider/v1",
