@@ -28,6 +28,14 @@ export default function ChatPage() {
     const scrollRef = useRef(null);
     const abortRef = useRef(null);
     const inputRef = useRef(null);
+    /**
+     * Movies the agent found, held here (not in state) until the turn ends.
+     *
+     * Rendering them as they arrive made the strip rewrite itself on every tool
+     * call — cards appeared, swapped, vanished and came back. Buffering means
+     * the text streams first and the cards settle underneath it exactly once.
+     */
+    const pendingMoviesRef = useRef([]);
 
     // Keep the newest turn in view as text streams in.
     useEffect(() => {
@@ -44,6 +52,7 @@ export default function ChatPage() {
 
             setError(null);
             setInput('');
+            pendingMoviesRef.current = [];
 
             // History is what the server already knows about; the new turn is
             // appended locally as the streaming assistant placeholder.
@@ -80,7 +89,10 @@ export default function ChatPage() {
                             }
                             return next;
                         }),
-                    onMovies: (movies) => patchLast({ movies }),
+                    onMovies: (movies) => {
+                        // Buffer only: no re-render, so nothing flickers.
+                        pendingMoviesRef.current = movies;
+                    },
                     onReset: () => patchLast({ content: '' }),
                     onError: (msg) => setError(msg),
                 });
@@ -89,13 +101,18 @@ export default function ChatPage() {
             } finally {
                 abortRef.current = null;
                 setStreaming(false);
-                // Drop an assistant bubble that never received any content.
+
+                // Reveal the cards now that the text has finished streaming.
+                const movies = pendingMoviesRef.current;
+                pendingMoviesRef.current = [];
                 setMessages((prev) => {
                     const last = prev[prev.length - 1];
-                    if (last?.role === 'assistant' && !last.content && !last.movies?.length) {
-                        return prev.slice(0, -1);
-                    }
-                    return prev;
+                    if (last?.role !== 'assistant') return prev;
+                    // Drop a bubble that produced neither text nor cards.
+                    if (!last.content && !movies.length) return prev.slice(0, -1);
+                    const next = [...prev];
+                    next[next.length - 1] = { ...last, movies };
+                    return next;
                 });
                 inputRef.current?.focus();
             }

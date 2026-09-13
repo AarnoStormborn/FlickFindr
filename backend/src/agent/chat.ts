@@ -64,6 +64,35 @@ export function toAgentRow(row: Record<string, unknown>): Record<string, unknown
   };
 }
 
+/**
+ * How many movie suggestions to show for a request.
+ *
+ * Six by default — a longer strip reads as a catalogue dump rather than a
+ * recommendation. A request that explicitly asks for more ("show me 10", "more
+ * options") raises it, capped so one prompt cannot return the whole catalogue.
+ */
+export function maxSuggestionsFor(message: string): number {
+  const DEFAULT = 6;
+  const HARD_MAX = 12;
+  const text = String(message ?? "");
+
+  // A bare number is usually a runtime or a year ("under 2 hours", "from
+  // 1999"), so only treat it as a count when it is paired with a quantity word
+  // or a request verb.
+  const number = text.match(/\b(\d{1,2})\b/);
+  const quantityWord = /\b(movies?|films?|options?|suggestions?|picks?|results?|titles?)\b/i.test(text);
+  const requestVerb = /\b(show|give|list|recommend|suggest)\b[^0-9]{0,14}\d/i.test(text);
+  if (number && Number(number[1]) > DEFAULT && (quantityWord || requestVerb)) {
+    return Math.min(Number(number[1]), HARD_MAX);
+  }
+
+  if (/\bmore\b|\badditional\b|\bextra\b|\bothers?\b|\bbigger list\b/i.test(text)) {
+    return HARD_MAX;
+  }
+
+  return DEFAULT;
+}
+
 /** Trim a tool result row down to the fields the chat UI needs. */
 function toChatMovie(row: Record<string, unknown>): ChatMovie | undefined {
   // Tolerate string/numeric ids: pg returns bigint columns as strings.
@@ -119,7 +148,8 @@ Style rules (the UI renders plain text, not markdown):
 
 Curation: once you have decided which movies to recommend, call show_movies with their ids so
 the UI can display them. Search results alone are noisy — only pass the ones you actually
-recommend. Do this before writing your final answer.`;
+recommend. Do this before writing your final answer. Pass at most 6 ids unless the user
+explicitly asked for more.`;
 
 export function buildChatTools(
   db: Queryable,
@@ -290,6 +320,10 @@ export function buildChatTools(
 export async function createChatRunner(db: Queryable, embed: (text: string) => Promise<number[]>, callbacks: ChatSessionCallbacks): Promise<ChatRunner> {
   const modelRuntime = await getModelRuntime();
 
+  // Per-turn suggestion cap, decided from the user's own wording (default 6).
+  // Set before the run; the tool callbacks below read it.
+  let maxSuggestions = 6;
+
   /**
    * The agent's own picks. These accumulate across show_movies calls (models
    * often curate one movie at a time) and, once any exist, they win over raw
@@ -308,7 +342,7 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
       return true;
     });
     if (!deduped.length) return;
-    callbacks.onMovies?.(deduped.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, 8));
+    callbacks.onMovies?.(deduped.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0)).slice(0, maxSuggestions));
   };
 
   const onCurated = (movies: ChatMovie[]) => {
@@ -319,7 +353,7 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
       curated.push(m);
       added = true;
     }
-    if (added) callbacks.onMovies?.(curated.slice(0, 12));
+    if (added) callbacks.onMovies?.(curated.slice(0, maxSuggestions));
   };
 
   const tools = buildChatTools(db, embed, onSearchResults, onCurated);
@@ -406,6 +440,7 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
 
   return {
     async run(message: string, history: { role: "user" | "assistant"; content: string }[] = []) {
+      maxSuggestions = maxSuggestionsFor(message);
       const composite = history.length
         ? `${history.map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`).join("\n")}\n\nUser: ${message}`
         : message;

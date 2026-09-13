@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildChatTools, extractMovieRows, toAgentRow } from "../src/agent/chat.js";
+import { buildChatTools, extractMovieRows, maxSuggestionsFor, toAgentRow } from "../src/agent/chat.js";
 
 /**
  * Regression guard for a bug that only showed up live: `structuralService`
@@ -153,5 +153,45 @@ describe("toAgentRow", () => {
     const before = JSON.stringify(rows).length;
     const after = JSON.stringify(rows.map((r) => toAgentRow(r))).length;
     expect(after).toBeLessThan(before * 0.6);
+  });
+});
+
+describe("maxSuggestionsFor", () => {
+  it("defaults to six", () => {
+    expect(maxSuggestionsFor("a cozy rainy sunday film")).toBe(6);
+    expect(maxSuggestionsFor("")).toBe(6);
+    expect(maxSuggestionsFor(undefined as unknown as string)).toBe(6);
+  });
+
+  it("ignores numbers that are not a count", () => {
+    // Runtimes and years are not requests for a longer list.
+    expect(maxSuggestionsFor("a heist film under 2 hours")).toBe(6);
+    expect(maxSuggestionsFor("something from 1999")).toBe(6);
+    expect(maxSuggestionsFor("a movie under 120 minutes")).toBe(6);
+  });
+
+  it("honours an explicit count paired with a quantity word", () => {
+    expect(maxSuggestionsFor("show me 10 movies")).toBe(10);
+    expect(maxSuggestionsFor("give me 8 film options")).toBe(8);
+    expect(maxSuggestionsFor("recommend 12 titles")).toBe(12);
+  });
+
+  it("honours a request verb followed by a count", () => {
+    expect(maxSuggestionsFor("show me 9")).toBe(9);
+    expect(maxSuggestionsFor("list 7 please")).toBe(7);
+  });
+
+  it("caps at twelve", () => {
+    expect(maxSuggestionsFor("show me 50 movies")).toBe(12);
+  });
+
+  it("treats requests for more as the maximum", () => {
+    for (const m of ["more options", "any others?", "show me additional picks", "got anything extra"]) {
+      expect(maxSuggestionsFor(m)).toBe(12);
+    }
+  });
+
+  it("does not raise the cap for a count at or below the default", () => {
+    expect(maxSuggestionsFor("show me 3 movies")).toBe(6);
   });
 });
