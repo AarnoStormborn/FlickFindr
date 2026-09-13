@@ -172,13 +172,19 @@
 
 /* ---------- Result cards ---------- */
 
-/* Exactly three per row (not auto-fill): a recommendation strip should read as
-   a row of picks, and auto-fill produced ragged 2/4/5-card lines. */
+/* Three per row (not auto-fill): a recommendation strip should read as a row of
+   picks, and auto-fill produced ragged 2/4/5-card lines.
+
+   Columns are capped rather than 1fr: stretching them to fill the text column
+   made each card ~213px, which dwarfed the message it belonged to. Capping at
+   150px keeps them compact and self-contained, and minmax(0, …) still lets them
+   shrink on narrow screens so three always fit. */
 .chat-movies {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 150px));
+    justify-content: start;
     align-items: start;
-    gap: var(--gutter-grid);
+    gap: var(--space-md);
     padding-top: var(--space-md);
 }
 
@@ -186,10 +192,8 @@
     min-width: 0;
 }
 
-/* MovieCard is a fixed-width (180px) item built for the scrolling carousel rows.
-   In this grid that left each card stranded on the left of a wider cell, with a
-   ~73px dead gap, so let it fill its column instead — the poster scales via its
-   2:3 aspect-ratio. */
+/* MovieCard is a fixed-width (180px) item built for the scrolling carousel rows,
+   so let it fill its column here — the poster scales via its 2:3 aspect-ratio. */
 .chat-movie .movie-card {
     width: 100%;
 }
