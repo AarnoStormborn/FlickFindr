@@ -18,6 +18,25 @@ const ChatRequestSchema = z.object({
     .optional(),
 });
 
+/**
+ * Turn provider/SDK failures into something a visitor can act on. The raw
+ * message is a developer aid that leaks internal paths, so it is replaced.
+ */
+function friendlyChatError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/no api key|not configured|missing.*credential|unauthor/i.test(raw)) {
+    return "The concierge isn't configured on this server yet.";
+  }
+  if (/rate.?limit|429|quota/i.test(raw)) {
+    return "The concierge is busy right now — try again in a moment.";
+  }
+  if (/timeout|timed out|aborted/i.test(raw)) {
+    return "That took too long. Try a shorter question.";
+  }
+  logger.error({ err }, "Chat failed");
+  return "Something went wrong reaching the concierge.";
+}
+
 export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (text: string) => Promise<number[]> }): void {
   const { db, embed } = deps;
 
@@ -31,7 +50,12 @@ export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (
     }
 
     const raw = reply.raw;
+    // NOTE: writeHead() *replaces* the whole header set, which would discard
+    // the CORS headers the @fastify/cors hook already put on the reply —
+    // breaking the chat for any cross-origin frontend (e.g. Vercel -> Render)
+    // even though same-origin and curl requests still work. Carry them over.
     raw.writeHead(200, {
+      ...(reply.getHeaders() as Record<string, string | number | string[]>),
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
@@ -65,6 +89,8 @@ export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (
     try {
       runner = await createChatRunner(db, embed, {
         onDelta: (delta) => send({ delta }),
+        onReset: () => send({ reset: true }),
+        onMovies: (movies) => send({ movies }),
         onError: (message) => send({ error: message }),
         onDone: () => send({ done: true }),
       });
@@ -72,7 +98,7 @@ export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (
       send({ done: true });
     } catch (err) {
       logger.error({ err }, "Chat failed");
-      send({ error: err instanceof Error ? err.message : "Chat failed" });
+      send({ error: friendlyChatError(err) });
     } finally {
       clearTimeout(abortTimer);
       runner?.dispose();

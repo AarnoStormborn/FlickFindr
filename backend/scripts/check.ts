@@ -7,7 +7,7 @@
  */
 
 import { getPool, closePool } from "../src/db/pool.js";
-import { getAgentModel, getModelRuntime } from "../src/agent/runtime.js";
+import { resolveAgentModel, getModelRuntime } from "../src/agent/runtime.js";
 import { config } from "../src/config.js";
 import { logger } from "../src/logger.js";
 
@@ -47,12 +47,16 @@ async function main(): Promise<void> {
   try {
     const runtime = await getModelRuntime();
     const available = await runtime.getAvailable();
-    report.agent = { model: config.agent.model ?? "auto (first available)", available_models: available.map((m) => String(m.id ?? m.name ?? "?")) };
-    if (config.agent.model && !available.some((m) => String(m.id ?? m.name ?? "").toLowerCase().includes(config.agent.model!.toLowerCase()))) {
-      warnings.push(`PI_MODEL=${config.agent.model} not found among authenticated models`);
-    }
+    const resolved = await resolveAgentModel();
+    report.agent = {
+      model: config.agent.model ?? "auto (see fallbacks)",
+      resolved_model: resolved ? `${resolved.provider}/${resolved.id}` : null,
+      available_models: available.map((m) => `${m.provider}/${m.id}`),
+    };
     if (available.length === 0) {
-      warnings.push("no authenticated models — check ~/.pi/agent/auth.json or provider credits");
+      warnings.push("no authenticated models — set COMMAND_CODE_API_KEY (see backend/pi-agent/models.json)");
+    } else if (!resolved) {
+      warnings.push("no model could be resolved for the agent");
     }
   } catch (err) {
     report.agent = { error: err instanceof Error ? err.message : String(err) };

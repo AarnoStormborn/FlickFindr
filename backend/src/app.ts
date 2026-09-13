@@ -6,6 +6,7 @@ import type { HybridSearchRequest, Queryable } from "./models.js";
 import { flicksRoutes } from "./routes/flicks.js";
 import { searchRoutes } from "./routes/search.js";
 import { chatRoutes } from "./routes/chat.js";
+import { isAgentConfigured } from "./agent/runtime.js";
 
 export interface AppDeps {
   db: Queryable;
@@ -25,7 +26,15 @@ export function buildApp(deps: AppDeps) {
     allowedHeaders: ["*"],
   });
 
-  app.get("/", async () => ({ message: "API is running !!!" }));
+  app.get("/", async () => ({
+    message: "API is running !!!",
+    agent: {
+      enabled: config.agent.enabled,
+      // Whether a model is actually authenticated. Lets clients tell a real
+      // outage from "the concierge was never switched on" without guessing.
+      configured: config.agent.enabled && (await isAgentConfigured()),
+    },
+  }));
 
   app.register(async (instance) => {
     flicksRoutes(instance, { db: deps.db });

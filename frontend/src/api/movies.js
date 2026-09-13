@@ -25,7 +25,7 @@ function resolveApiBase() {
     return 'http://127.0.0.1:8001';
 }
 
-const API_BASE_URL = resolveApiBase();
+export const API_BASE_URL = resolveApiBase();
 
 const responseCache = new Map();
 const inflight = new Map();

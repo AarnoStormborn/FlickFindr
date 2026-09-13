@@ -6,6 +6,7 @@ import GenrePage from './pages/GenrePage';
 import EraPage from './pages/EraPage';
 import SearchPage from './pages/SearchPage';
 import ListsPage from './pages/ListsPage';
+import ChatPage from './pages/ChatPage';
 import { ListsProvider } from './context/ListsContext';
 import './App.css';
 
@@ -22,6 +23,7 @@ function App() {
             <Route path="/genre/:name" element={<GenrePage />} />
             <Route path="/era/:id" element={<EraPage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/chat" element={<ChatPage />} />
             <Route path="/lists" element={<ListsPage />} />
           </Routes>
         </div>
