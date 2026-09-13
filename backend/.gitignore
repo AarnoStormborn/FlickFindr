@@ -6,3 +6,6 @@ dist/
 coverage/
 # Model catalog cache written by ModelRuntime (regenerated on boot)
 pi-agent/models-store.json
+
+# Dedicated agent dir (sessions, catalog cache) — not host ~/.pi/agent
+pi-agent/agent/

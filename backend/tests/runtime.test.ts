@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseModel } from "../src/agent/runtime.js";
+import { chooseModel, matchCandidates } from "../src/agent/runtime.js";
 
 /**
  * Guards the model-selection policy. The bug this exists for: omitting an
@@ -66,5 +66,38 @@ describe("chooseModel", () => {
 
   it("ignores blank preferences", () => {
     expect(chooseModel([FREE], ["", "   "])).toBe(FREE);
+  });
+});
+
+describe("matchCandidates (provider-scoped)", () => {
+  const DIRECT = model("deepseek", "deepseek-v4-flash", 0.14, 0.28);
+  const VIA_AGGREGATOR = model("commandcode", "deepseek/deepseek-v4-flash", 0.3, 1.2);
+  const GROQ_GPT_OSS = model("groq", "openai/gpt-oss-120b", 0.15, 0.6);
+
+  it("does not let a provider-scoped name match another provider", () => {
+    // Regression: "deepseek/deepseek-v4-flash" is a substring of
+    // "commandcode/deepseek/deepseek-v4-flash", so an unscoped search picked
+    // the aggregator's (pricier) model instead of the direct provider's.
+    expect(matchCandidates([VIA_AGGREGATOR, DIRECT], ["deepseek/deepseek-v4-flash"])).toEqual([DIRECT]);
+  });
+
+  it("still matches a substring within the named provider", () => {
+    expect(matchCandidates([VIA_AGGREGATOR, DIRECT, GROQ_GPT_OSS], ["deepseek/v4-flash"])).toEqual([DIRECT]);
+  });
+
+  it("preserves preference order and drops unmatched entries", () => {
+    const out = matchCandidates([DIRECT, GROQ_GPT_OSS], ["groq/openai/gpt-oss-120b", "openai/not-real", "deepseek/deepseek-v4-flash"]);
+    expect(out).toEqual([GROQ_GPT_OSS, DIRECT]);
+  });
+
+  it("returns nothing for ids Pi's catalog does not have", () => {
+    // e.g. groq/qwen/qwen3.8-27b: offered by the provider, absent from Pi.
+    expect(matchCandidates([GROQ_GPT_OSS], ["groq/qwen/qwen3.8-27b"])).toEqual([]);
+  });
+
+  it("prefers an exact id over a substring within a provider", () => {
+    const exact = model("groq", "qwen/qwen3.8-27b");
+    const loose = model("groq", "qwen/qwen3.8-27b-preview");
+    expect(matchCandidates([loose, exact], ["groq/qwen/qwen3.8-27b"])).toEqual([exact]);
   });
 });

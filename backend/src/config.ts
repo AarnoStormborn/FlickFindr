@@ -51,44 +51,35 @@ export const config = {
     /**
      * Ordered fallbacks, tried after PI_MODEL.
      *
-     * Grouped cheapest/free-capable first, then cheap paid, then the Command
-     * Code provider. Pi reads each provider's key from the environment
-     * (GROQ_API_KEY, OPENROUTER_API_KEY, CEREBRAS_API_KEY, DEEPSEEK_API_KEY,
-     * COMMAND_CODE_API_KEY), and providers with no key simply do not appear in
-     * the available list, so listing several costs nothing. Chat also retries
-     * with the next candidate when a run produces no output — which is how a
-     * free tier running out degrades instead of breaking.
+     * Primary is DeepSeek direct: cheap (~$0.14/$0.28 per M tokens, roughly
+     * $0.003-0.01 per concierge turn), fast, and reliable — free tiers were
+     * measured to be too throttled and too flaky for a multi-step tool loop
+     * (Groq: 36-253s per turn, ~60% success; Command Code free: 100 req/day).
+     *
+     * Everything after it is a fallback so a billing problem or outage
+     * degrades to free before it degrades to broken. Pi reads each key from the
+     * environment and providers without a key simply do not appear, so listing
+     * several costs nothing.
      */
     modelFallbacks: process.env.AGENT_MODEL_FALLBACKS
       ? parseList(process.env.AGENT_MODEL_FALLBACKS)
       : [
-          // Groq: fastest by far (300-1,000+ tok/s, ~0.3s/request). Free tier
-          // is 1K req/day but only 200K tokens/day and 8K tokens/min.
-          //
-          // Use qwen3.8-27b, NOT the gpt-oss models: gpt-oss is a reasoning
-          // model and, in a tool loop, repeatedly answered with reasoning but
-          // no content — measured 1 success in 4 turns, each failure ending
-          // silently after ~20s with cards but no text. qwen3.8-27b produced a
-          // full answer first try (also 1,048 chars + 5 cards on retest).
-          // qwen3.6-27b returns nothing at all, so pin 3.8.
-          // Only ids the account actually exposes are listed — an unavailable
-          // model costs a whole retry attempt before it fails.
-          "groq/qwen/qwen3.8-27b",
+          // Primary: reliable and cheap.
+          "deepseek/deepseek-v4-flash",
+          // Free tiers. Only ids Pi's catalog can actually route are listed:
+          // it does not know several models the providers themselves offer
+          // (e.g. groq/qwen/qwen3.8-27b), and a dead entry just burns a retry.
           "groq/openai/gpt-oss-120b",
-          // OpenRouter free models (17 tool-capable; 50 req/day free, 1,000/day
-          // once $10 of credit is on the account). Large context helps here.
           "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
           "openrouter/poolside/laguna-s-2.1:free",
           "openrouter/google/gemma-4-31b-it:free",
-          // Command Code free models, then its cheap paid ones.
           "commandcode/meituan/LongCat-2.0:free",
           "commandcode/inclusionai/ling-3.0-flash-sante:free",
-          "commandcode/poolside/laguna-s-2.1-free",
-          "commandcode/deepseek/deepseek-v4-flash",
-          // Direct providers, cheap and reliable.
-          "deepseek/deepseek-v4-flash",
+          // Other cheap paid options.
+          "deepseek/deepseek-v4-pro",
           "cerebras/gpt-oss-120b",
           "google/gemini-2.5-flash-lite",
+          "commandcode/deepseek/deepseek-v4-flash",
         ],
     /** Override the bundled pi-agent/models.json location. */
     modelsPath: process.env.PI_MODELS_PATH ?? undefined,

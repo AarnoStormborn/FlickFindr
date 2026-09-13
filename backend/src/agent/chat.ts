@@ -2,7 +2,6 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   defineTool,
-  getAgentDir,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -10,7 +9,7 @@ import { logger } from "../logger.js";
 import type { Queryable } from "../models.js";
 import { structuralService, MOVIE_COLUMNS } from "../services/structural.js";
 import { semanticService } from "../services/semantic.js";
-import { getModelRuntime, resolveAgentModelCandidates } from "./runtime.js";
+import { AGENT_DIR, getModelRuntime, resolveAgentModelCandidates } from "./runtime.js";
 
 export interface ChatSessionCallbacks {
   onDelta: (text: string) => void;
@@ -328,7 +327,7 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
 
   const resourceLoader = new DefaultResourceLoader({
     cwd: process.cwd(),
-    agentDir: getAgentDir(),
+    agentDir: AGENT_DIR,
     extensionFactories: [],
     skillsOverride: (current) => ({ skills: [], diagnostics: current.diagnostics }),
     promptsOverride: (current) => ({ prompts: [], diagnostics: current.diagnostics }),
@@ -431,6 +430,14 @@ export async function createChatRunner(db: Queryable, embed: (text: string) => P
         try {
           await active.session.prompt(composite);
           if (active.gotText()) {
+            // Log the winner explicitly: without this, "which model actually
+            // answered?" is unanswerable, which previously led to a wrong
+            // conclusion about a model that Pi's catalog never even had.
+            const winner = candidates[i];
+            logger.info(
+              { model: winner ? `${winner.provider}/${winner.id}` : "default", attempt: i },
+              "Chat answered",
+            );
             callbacks.onDone?.();
             return;
           }
