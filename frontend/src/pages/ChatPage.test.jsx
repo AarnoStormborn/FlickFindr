@@ -33,6 +33,9 @@ async function sendMessage(text) {
 describe('Concierge streaming', () => {
     beforeEach(() => {
         vi.mocked(streamChat).mockReset();
+        // The transcript now persists, so tests must start from a clean store
+        // or a previous test's conversation leaks into the next one.
+        localStorage.clear();
         globalThis.fetch = vi.fn(() =>
             Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ results: [], total: 0 }) }),
         );
@@ -113,5 +116,44 @@ describe('Concierge streaming', () => {
         await waitFor(() => expect(document.querySelector('.chat-movies')).toBeTruthy());
         // Column count itself is CSS; assert the container the grid rules target.
         expect(document.querySelectorAll('.chat-movies .chat-movie')).toHaveLength(2);
+    });
+    it('keeps the conversation when navigating away and back', async () => {
+        vi.mocked(streamChat).mockImplementation(async ({ onDelta, onMovies }) => {
+            onDelta('Try The Usual Suspects.');
+            onMovies(MOVIES);
+        });
+
+        const user = userEvent.setup();
+        renderChat();
+        await sendMessage('a heist movie');
+        await waitFor(() => expect(document.querySelectorAll('.chat-movies .movie-card')).toHaveLength(2));
+
+        // Leave the concierge for another route...
+        await user.click(document.querySelector('.navbar-menu a[href="/"]'));
+        await waitFor(() => expect(document.querySelector('.chat-page')).toBeNull());
+
+        // ...and come back. The transcript should still be here.
+        await user.click(document.querySelector('.navbar-menu a[href="/chat"]'));
+        await waitFor(() => expect(document.querySelector('.chat-page')).toBeTruthy());
+        expect(screen.getByText('a heist movie')).toBeInTheDocument();
+        expect(screen.getByText('Try The Usual Suspects.')).toBeInTheDocument();
+        expect(document.querySelectorAll('.chat-movies .movie-card')).toHaveLength(2);
+    });
+
+    it('offers a way to start over once a transcript exists', async () => {
+        vi.mocked(streamChat).mockImplementation(async ({ onDelta }) => {
+            onDelta('Hello.');
+        });
+
+        const user = userEvent.setup();
+        renderChat();
+        expect(screen.queryByRole('button', { name: /new chat/i })).toBeNull();
+
+        await sendMessage('hi');
+        const newChat = await screen.findByRole('button', { name: /new chat/i });
+        await user.click(newChat);
+
+        await waitFor(() => expect(document.querySelectorAll('.chat-bubble-assistant')).toHaveLength(0));
+        expect(screen.queryByText('Hello.')).toBeNull();
     });
 });

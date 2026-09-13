@@ -3,6 +3,7 @@ import MovieCard from '../components/MovieCard';
 import LoadingQuips from '../components/LoadingQuips';
 import RichText from '../components/RichText';
 import { streamChat } from '../api/chat';
+import useChatTranscript from '../hooks/useChatTranscript';
 import './ChatPage.css';
 
 const SUGGESTIONS = [
@@ -20,7 +21,8 @@ const SUGGESTIONS = [
  * click into rather than a wall of titles.
  */
 export default function ChatPage() {
-    const [messages, setMessages] = useState([]);
+    // Persisted, so leaving the page and coming back keeps the conversation.
+    const { messages, update: setMessages, clear } = useChatTranscript();
     const [input, setInput] = useState('');
     const [streaming, setStreaming] = useState(false);
     const [error, setError] = useState(null);
@@ -117,7 +119,7 @@ export default function ChatPage() {
                 inputRef.current?.focus();
             }
         },
-        [messages, streaming],
+        [messages, streaming, setMessages],
     );
 
     const onSubmit = (event) => {
@@ -142,12 +144,27 @@ export default function ChatPage() {
     return (
         <main className="chat-page">
             <header className="chat-header">
-                <h1 className="chat-title">
-                    The <em>Concierge</em>
-                </h1>
-                <p className="chat-subtitle">
-                    Describe what you feel like watching. Ask for something like a film you loved.
-                </p>
+                <div className="chat-header-text">
+                    <h1 className="chat-title">
+                        The <em>Concierge</em>
+                    </h1>
+                    <p className="chat-subtitle">
+                        Describe what you feel like watching. Ask for something like a film you loved.
+                    </p>
+                </div>
+                {!empty && (
+                    <button
+                        type="button"
+                        className="chat-new"
+                        onClick={() => {
+                            abortRef.current?.abort();
+                            clear();
+                            inputRef.current?.focus();
+                        }}
+                    >
+                        New chat
+                    </button>
+                )}
             </header>
 
             <div className="chat-scroll" ref={scrollRef}>
