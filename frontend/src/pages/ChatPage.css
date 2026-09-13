@@ -1,26 +1,28 @@
 .chat-page {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--navbar-height));
-    margin-top: var(--navbar-height);
+    height: 100vh;
     max-width: 1080px;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 0 var(--space-lg);
+    margin: 0 auto;
+    /* --nav-offset, like every other page: the navbar floats 8px down, so a
+       plain navbar-height margin tucked the header underneath it and left the
+       title only 16px of clearance. */
+    padding: var(--nav-offset) var(--space-lg) 0;
 }
 
 /* ---------- Header ---------- */
 
 .chat-header {
-    padding: var(--space-lg) 0 var(--space-md);
+    padding: var(--space-lg) 0;
     border-bottom: 1px solid var(--line-subtle);
 }
 
 .chat-title {
     font-family: var(--font-display);
-    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    font-size: clamp(1.7rem, 4vw, 2.4rem);
     font-weight: 500;
     letter-spacing: -0.01em;
+    line-height: 1.2;
     margin: 0;
     color: var(--text-primary);
 }
@@ -31,9 +33,10 @@
 }
 
 .chat-subtitle {
-    margin: var(--space-xs) 0 0;
+    margin: var(--space-sm) 0 0;
     color: var(--text-secondary);
     font-size: var(--font-size-sm);
+    line-height: 1.5;
 }
 
 /* ---------- Scrolling transcript ---------- */
@@ -271,7 +274,13 @@
 
 @media (max-width: 640px) {
     .chat-page {
-        padding: 0 var(--space-md);
+        /* Keep the navbar offset — a bare horizontal shorthand here would
+           reset the top padding and push the header under the navbar. */
+        padding: var(--nav-offset) var(--space-md) 0;
+    }
+
+    .chat-header {
+        padding: var(--space-md) 0;
     }
 
     .chat-bubble {
