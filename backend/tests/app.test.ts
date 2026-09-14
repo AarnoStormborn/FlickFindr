@@ -169,4 +169,69 @@ describe("FlickFindr API (injected deps)", () => {
     expect(res.headers["content-type"]).toContain("text/event-stream");
     expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
   });
+
+    describe("input validation on /flicks (security)", () => {
+        /**
+         * These routes coerced query params with Number() and had no bounds, so
+         * `?limit=100000` returned the entire catalogue in one response (30,749
+         * rows measured) and malformed values reached Postgres and surfaced as
+         * 500s (`?skip=abc`, `?limit=-5`, `/flicks/movie/abc`).
+         */
+        it("rejects an unbounded limit instead of returning the whole catalogue", async () => {
+            const res = await app.inject({ method: "GET", url: "/flicks/?limit=100000" });
+            expect(res.statusCode).toBe(400);
+            expect(res.json().detail).toMatch(/100/);
+        });
+
+        it("accepts a limit within bounds", async () => {
+            expect((await app.inject({ method: "GET", url: "/flicks/?limit=20&skip=0" })).statusCode).toBe(200);
+        });
+
+        it("rejects malformed and negative pagination with 400, not 500", async () => {
+            for (const url of ["/flicks/?skip=abc", "/flicks/?limit=abc", "/flicks/?limit=-5", "/flicks/?skip=-1"]) {
+                const res = await app.inject({ method: "GET", url });
+                expect(res.statusCode, url).toBe(400);
+            }
+        });
+
+        it("rejects a non-numeric or out-of-range movie id with 400", async () => {
+            for (const url of ["/flicks/movie/abc", "/flicks/movie/0", "/flicks/movie/-1", "/flicks/movie/99999999999999999999"]) {
+                const res = await app.inject({ method: "GET", url });
+                expect(res.statusCode, url).toBe(400);
+            }
+        });
+
+        it("bounds the similar-movies limit", async () => {
+            expect((await app.inject({ method: "GET", url: "/flicks/movie/1/similar?limit=999999" })).statusCode).toBe(400);
+        });
+
+        it("bounds filter pagination and rejects oversized filter values", async () => {
+            expect((await app.inject({ method: "GET", url: "/flicks/filter?limit=99999" })).statusCode).toBe(400);
+            expect((await app.inject({ method: "GET", url: `/flicks/filter?genre=${"a".repeat(101)}` })).statusCode).toBe(400);
+            expect((await app.inject({ method: "GET", url: "/flicks/filter?genre=Drama&limit=10" })).statusCode).toBe(200);
+        });
+    });
+
+    describe("rate limiting (the API is public and /chat spends money)", () => {
+        it("advertises a limit on ordinary responses", async () => {
+            const res = await app.inject({ method: "GET", url: "/flicks/?limit=5" });
+            // Presence of these headers is proof the plugin is registered and
+            // counting, without having to hammer the endpoint.
+            expect(res.headers["x-ratelimit-limit"]).toBeDefined();
+            expect(Number(res.headers["x-ratelimit-limit"])).toBeGreaterThan(0);
+        });
+
+        it("rejects a burst on /chat with 429 once the limit is passed", async () => {
+            // /chat has the strictest limit (8/min default) because each turn is
+            // several model calls. Declared last: it deliberately exhausts the
+            // bucket for this app instance.
+            const codes: number[] = [];
+            for (let i = 0; i < 12; i++) {
+                const res = await app.inject({ method: "POST", url: "/chat", payload: { message: "hi" } });
+                codes.push(res.statusCode);
+            }
+            expect(codes[0]).not.toBe(429); // normal use is allowed first
+            expect(codes).toContain(429); // and a burst is stopped
+        });
+    });
 });

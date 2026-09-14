@@ -31,5 +31,10 @@ COPY --from=build /app/pi-agent ./pi-agent
 # Pre-warm the embedding model so the first search isn't slow.
 RUN mkdir -p /app/.cache && chmod -R 777 /app/.cache
 
+# Drop root: the app never needs to write outside /app/.cache, so a compromise
+# should not run with container-root privileges.
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 8000
 CMD ["sh", "-c", "node dist/index.js"]

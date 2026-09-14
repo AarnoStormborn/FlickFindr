@@ -8,6 +8,11 @@ on:
   pull_request:
     branches: [main]
 
+
+# Only needs to read PR metadata.
+permissions:
+  contents: read
+  pull-requests: read
 jobs:
   main-branch-guard:
     name: Main branch guard

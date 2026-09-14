@@ -5,6 +5,12 @@ on:
     branches: [main, dev]
   pull_request:
 
+
+# Least privilege: these jobs only read the repo, so the default token scope
+# (which can write on push events) is narrowed. A compromised action cannot
+# push to the repository with this set.
+permissions:
+  contents: read
 # Branch model:
 #   main = production (only merges from dev, protected)
 #   dev  = integration (feature branches merge here first)

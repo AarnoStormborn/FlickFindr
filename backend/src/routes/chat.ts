@@ -40,7 +40,15 @@ function friendlyChatError(err: unknown): string {
 export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (text: string) => Promise<number[]> }): void {
   const { db, embed } = deps;
 
-  app.post("/chat", async (request, reply) => {
+  app.post(
+    "/chat",
+    {
+      // Stricter than the global ceiling: each turn is several model calls, so
+      // this is the endpoint that can actually cost money or burn a free tier's
+      // daily quota.
+      config: { rateLimit: { max: Number(process.env.CHAT_RATE_LIMIT_MAX ?? 8), timeWindow: "1 minute" } },
+    },
+    async (request, reply) => {
     if (!config.agent.enabled) {
       return reply.code(503).send({ detail: "Agent chat is disabled (AGENT_ENABLED=false)" });
     }
