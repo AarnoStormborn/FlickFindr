@@ -71,18 +71,26 @@ No `.env` is required at boot — config ships dev defaults matching
   frontend concierge at `/chat`).
 - Hybrid search relaxes categorical filters (genre/directors/stars) when the
   strict conjunction returns nothing, so users always get ranked results.
-- **Provider:** declared in [`pi-agent/models.json`](pi-agent/models.json) —
-  currently Command Code (OpenAI-compatible at
-  `https://api.commandcode.ai/provider/v1`). Set `COMMAND_CODE_API_KEY` and the
-  provider's models become available; without it the agent reports "not
+- **Provider(s):** the bundled [`pi-agent/models.json`](pi-agent/models.json)
+  declares Command Code (OpenAI-compatible at
+  `https://api.commandcode.ai/provider/v1`). Groq, OpenRouter, DeepSeek,
+  Cerebras and Google are Pi's native providers and need only their env key
+  (`GROQ_API_KEY`, `OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY`,
+  `CEREBRAS_API_KEY`, `GEMINI_API_KEY`). Without any key the agent reports "not
   configured" and search falls back to the raw query.
 - **Model choice is explicit, never accidental.** The agent resolves
-  `PI_MODEL` → `AGENT_MODEL_FALLBACKS` (default: the free Laguna model, then
-  cheap DeepSeek/MiMo/GLM/Qwen) → and only then the *cheapest* authenticated
-  model. Provider catalogs mix free models with ~$50/M flagships, so the SDK's
-  own "first available" default is not used.
+  `PI_MODEL` → `AGENT_MODEL_FALLBACKS` (default: the cheapest reliable paid
+  model first, then the free Groq/OpenRouter/Command Code tiers) → and only
+  then the *cheapest* authenticated model. Provider catalogs mix free models
+  with ~$50/M flagships, so the SDK's own "first available" default is not
+  used. A run that returns no text retries with the next candidate, which is
+  how an exhausted free tier degrades instead of breaking.
+- `getAvailable()` validates credentials, **not** upstream health — a
+  free model that is rate-limited upstream still gets selected and then fails,
+  so the order favours models verified to work.
 - Credentials are held in memory, not written to `auth.json`.
-- `PI_MODELS_PATH` overrides the bundled config; timeouts are configurable.
+- `PI_MODELS_PATH` overrides the bundled config; timeouts and rate limits are
+  configurable (`CHAT_TIMEOUT_MS`, `RATE_LIMIT_MAX`, `CHAT_RATE_LIMIT_MAX`).
 
 ## API
 
@@ -102,8 +110,16 @@ No `.env` is required at boot — config ships dev defaults matching
 ## Tests
 
 ```bash
-npm test
+npm test              # fast, hermetic
+npm run test:coverage # same run, against the threshold ratchet CI enforces
 ```
+
+The suite runs **without** loading `backend/.env`: provider keys are skipped
+when `NODE_ENV=test`, so no test can reach a live LLM API (that used to make CI
+network-dependent, slow, quota-burning and intermittently timing out). Modules
+that genuinely need a live Postgres or the embedding model (`src/db/pool.ts`,
+`src/embedding.ts`) are excluded from the unit-coverage denominator and are
+verified instead by `npm run check` and the deploy smoke tests.
 
 ## Migration notes (from Python backend)
 
