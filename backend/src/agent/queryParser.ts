@@ -35,16 +35,21 @@ Rules:
   Do not invent names, do not add or remove spaces or commas, and output null when uncertain.
 - Respond with the JSON object only. No markdown fences, no prose.`;
 
-/** Best-effort extraction of the final assistant text from a session's messages. */
-function lastAssistantText(messages: unknown[]): string | undefined {
+/** Best-effort extraction of the final assistant text from a session's messages. Exported for tests. */
+export function lastAssistantText(messages: unknown[]): string | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i] as { role?: string; content?: unknown };
     if (msg?.role !== "assistant") continue;
     const content = msg.content;
     if (typeof content === "string") return content;
     if (Array.isArray(content)) {
+      // Match on the part TYPE, not the presence of a `text` key: reasoning
+      // parts also expose .text, and treating a thinking block as the answer
+      // can make the JSON extraction below parse the model's own deliberation.
       const text = content
-        .filter((p): p is { type: string; text?: string } => typeof p === "object" && p !== null && "text" in p)
+        .filter((p): p is { type: string; text?: string } =>
+          typeof p === "object" && p !== null && (p as { type?: unknown }).type === "text",
+        )
         .map((p) => p.text ?? "")
         .join("");
       if (text) return text;
@@ -53,7 +58,12 @@ function lastAssistantText(messages: unknown[]): string | undefined {
   return undefined;
 }
 
-function parseJsonObject(raw: string): HybridSearchRequest | undefined {
+/**
+ * Pull the JSON object out of a model reply: strips markdown fences and
+ * grabs the outermost braces, so a chatty reply still parses.
+ * Exported for tests.
+ */
+export function parseJsonObject(raw: string): HybridSearchRequest | undefined {
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/^```\s*$/, "").trim();
   const match = cleaned.match(/\{[\s\S]*\}/);
   if (!match) return undefined;

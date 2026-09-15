@@ -1,4 +1,10 @@
-import "dotenv/config";
+// Tests must not read the developer's .env: it holds live provider keys, and
+// loading them made the suite call real LLM APIs on every /chat test — slow,
+// network-flaky (the SSE/rate-limit tests timed out at 10s), and it silently
+// burns free-tier quota. Vitest sets NODE_ENV=test.
+if (process.env.NODE_ENV !== "test") {
+  await import("dotenv/config");
+}
 
 /**
  * Central runtime configuration. Reads environment variables with dev
