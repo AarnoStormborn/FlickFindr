@@ -5,6 +5,12 @@ on:
     branches: [main, dev]
   pull_request:
 
+
+# Least privilege: these jobs only read the repo, so the default token scope
+# (which can write on push events) is narrowed. A compromised action cannot
+# push to the repository with this set.
+permissions:
+  contents: read
 # Branch model:
 #   main = production (only merges from dev, protected)
 #   dev  = integration (feature branches merge here first)
@@ -54,8 +60,8 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
-      - name: Test
-        run: npm test
+      - name: Test (with coverage ratchet)
+        run: npm run test:coverage
       - name: Build
         run: npm run build
 
@@ -78,8 +84,8 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      - name: Test
-        run: npm test
+      - name: Test (with coverage ratchet)
+        run: npm run test:coverage
       - name: Build
         run: npm run build
 

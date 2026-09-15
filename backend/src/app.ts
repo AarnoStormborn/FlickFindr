@@ -1,5 +1,7 @@
 import Fastify from "fastify";
+import type { FastifyServerOptions } from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import type { HybridSearchRequest, Queryable } from "./models.js";
@@ -17,13 +19,32 @@ export interface AppDeps {
 
 /** Build the Fastify app with all routes. Injectable deps make it testable. */
 export function buildApp(deps: AppDeps) {
-  const app = Fastify({ logger: config.logLevel !== "silent" });
+  const serverOptions: FastifyServerOptions = {
+    logger: config.logLevel !== "silent",
+    // Render terminates TLS at its edge and sets X-Forwarded-For. Trust exactly
+    // one hop (not `true`, which would take the leftmost, client-supplied
+    // entry) so the rate limiter keys on the real client IP and cannot be
+    // bypassed by forging a header.
+    trustProxy: (_address: string, hop: number) => hop < 1,
+  };
+  const app = Fastify(serverOptions);
 
   void app.register(cors, {
     origin: config.corsOrigins,
     credentials: true,
     methods: ["*"],
     allowedHeaders: ["*"],
+  });
+
+  // The API is public and unauthenticated, and /chat spends real money (several
+  // model calls per turn), so there is no protection against a single client
+  // draining the provider balance or the free tier's daily quota. These are
+  // coarse per-IP ceilings;
+  // /chat adds a stricter per-route limit on top of the global one.
+  void app.register(rateLimit, {
+    global: true,
+    max: Number(process.env.RATE_LIMIT_MAX ?? 120),
+    timeWindow: process.env.RATE_LIMIT_WINDOW ?? "1 minute",
   });
 
   app.get("/", async () => ({

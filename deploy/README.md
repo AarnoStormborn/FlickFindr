@@ -36,14 +36,25 @@ Browser
    - `DATABASE_URL` — your Supabase connection string
    - `CORS_ORIGINS` — your Vercel app URL (e.g. `https://flickfindr.vercel.app`)
    - `AGENT_ENABLED` — `true` (agent search; small LLM cost) or `false`
-   - `PI_MODEL` — optional cheapest model id (empty = first available)
+   - `COMMAND_CODE_API_KEY` / `GROQ_API_KEY` / `DEEPSEEK_API_KEY` — enables the
+     concierge and agent query parsing. Any one is enough; without a key the
+     concierge reports "not configured" and search uses the raw query.
+   - `PI_MODEL` — optional: pin one model as `provider/id`. Empty is fine: the
+     agent works through an ordered preference list (`AGENT_MODEL_FALLBACKS`)
+     and finally the cheapest authenticated model. It deliberately does *not*
+     fall back to "first available" — that once resolved a ~$50/M flagship.
+   - `RATE_LIMIT_MAX` / `CHAT_RATE_LIMIT_MAX` — optional per-IP ceilings (default
+     120/min and 8/min). The API is public and /chat costs money per turn.
    - `TMDB_API_KEY` — optional (only if ingest runs here)
 4. Deploy. Render auto-deploys on every push to `main` (backend changes).
 
-> Free tier spins down after 15 min idle → first request after idle takes
-> ~30–60s. **Fix:** ping it every ~10 min (UptimeRobot free, or a cron on
-> your Pi). The backend pre-warms its embedding model in the background on
-> boot, so warm requests are fast.
+> Free tier spins down after 15 min idle → the first request after idle takes
+> ~30–60s. **Do not run a keep-alive pinger.** A 24/7 ping burns ~744 of the
+> 750 free instance-hours each month, and exhausting that suspends *every* free
+> service until the cycle resets. The cold start is instead covered in the UI by
+> rotating loading quips (see `docs/roadmap.md`), at zero server cost. The
+> backend also pre-warms its embedding model in the background on boot, so warm
+> requests are fast.
 
 ## 3. Vercel (frontend)
 
@@ -86,7 +97,9 @@ DATABASE_URL="<supabase-connection-string>" npm run embeddings
   (or a cron hitting a Supabase function) prevents it.
 - **Backups:** Supabase free has no PITR — the S3 parquet files remain your
   archival source of truth; re-running the load step rebuilds the DB anytime.
-- **Cheapest agent model:** set `PI_MODEL` in Render env to your sub's
-  cheapest model (backend picks first-available when empty).
+- **Agent cost:** free tiers are fine for a hobby app but are throttled and
+   quota-capped (and DeepSeek needs a funded balance). A cheap paid model —
+   `deepseek-v4-flash` at ~$0.14/$0.28 per M tokens — is a few dollars per
+   thousand turns and far more predictable.
 - **Scale later:** upgrade Render/Supabase tiers if the app grows; no code
   changes needed.

@@ -1,4 +1,5 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
+import { z } from "zod";
 import { logger } from "../logger.js";
 import type { MovieResult, Queryable } from "../models.js";
 import { toMovieResult } from "../services/structural.js";
@@ -9,13 +10,49 @@ interface FlicksDeps {
   db: Queryable;
 }
 
+/**
+ * Query params arrive as strings, so they are coerced and bounded rather than
+ * passed through `Number()`. Without bounds, `?limit=100000` returned the whole
+ * catalogue in one response (30,749 rows) and malformed values reached Postgres
+ * and surfaced as 500s: `?skip=abc`, `?limit=-5` and `/flicks/movie/abc`.
+ */
+const MAX_PAGE_SIZE = 100;
+/** Postgres int4 upper bound — larger ids cannot exist, and must not be queried. */
+const MAX_MOVIE_ID = 2_147_483_647;
+
+const ListQuerySchema = z.object({
+  skip: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
+});
+
+const SimilarQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(24).default(12),
+});
+
+const FilterQuerySchema = ListQuerySchema.extend({
+  // Parameterised into ILIKE, so this is a sanity bound, not an injection guard.
+  genre: z.string().max(100).optional(),
+  directors: z.string().max(100).optional(),
+  stars: z.string().max(100).optional(),
+});
+
+const MovieIdParamsSchema = z.object({
+  movie_id: z.coerce.number().int().min(1).max(MAX_MOVIE_ID),
+});
+
+/** Uniform 400 for invalid input, matching the /search routes. */
+function invalid(reply: FastifyReply, error: z.ZodError) {
+  return reply.code(400).send({ detail: error.issues[0]?.message ?? "Invalid request" });
+}
+
 export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
   const { db } = deps;
 
   app.get("/flicks/", async (request, reply) => {
+    const parsed = ListQuerySchema.safeParse(request.query);
+    if (!parsed.success) return invalid(reply, parsed.error);
+    const { skip, limit } = parsed.data;
     try {
-      const skip = Number((request.query as Record<string, unknown>).skip ?? 0);
-      const limit = Number((request.query as Record<string, unknown>).limit ?? 10);
       const { rows } = await db.query(
         "SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ORDER BY rating DESC NULLS LAST LIMIT $1 OFFSET $2",
         [limit, skip],
@@ -30,8 +67,10 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
   });
 
   app.get("/flicks/movie/:movie_id", async (request, reply) => {
+    const parsedParams = MovieIdParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return invalid(reply, parsedParams.error);
+    const movieId = parsedParams.data.movie_id;
     try {
-      const movieId = Number((request.params as Record<string, unknown>).movie_id);
       const { rows } = await db.query(
         "SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies WHERE id = $1",
         [movieId],
@@ -48,10 +87,12 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
   });
 
   app.get("/flicks/movie/:movie_id/similar", async (request, reply) => {
+    const parsedParams = MovieIdParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return invalid(reply, parsedParams.error);
+    const parsedQuery = SimilarQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) return invalid(reply, parsedQuery.error);
     try {
-      const movieId = Number((request.params as Record<string, unknown>).movie_id);
-      const limit = Math.min(Number((request.query as Record<string, unknown>).limit ?? 12), 24);
-      const results = await semanticService.similarMovies(db, movieId, limit);
+      const results = await semanticService.similarMovies(db, parsedParams.data.movie_id, parsedQuery.data.limit);
       return { results };
     } catch (err) {
       logger.error({ err }, "Error fetching similar movies");
@@ -60,8 +101,10 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
   });
 
   app.get("/flicks/movie/:movie_id/trailers", async (request, reply) => {
+    const parsedParams = MovieIdParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return invalid(reply, parsedParams.error);
+    const movieId = parsedParams.data.movie_id;
     try {
-      const movieId = Number((request.params as Record<string, unknown>).movie_id);
       const { rows } = await db.query(
         "SELECT tmdb_id, trailer_key, trailer_source, trailer_checked FROM movies WHERE id = $1",
         [movieId],
@@ -123,19 +166,22 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
   });
 
   app.get("/flicks/filter", async (request, reply) => {
+    const parsed = FilterQuerySchema.safeParse(request.query);
+    if (!parsed.success) return invalid(reply, parsed.error);
+    const { skip, limit, genre, directors, stars } = parsed.data;
     try {
-      const q = request.query as Record<string, string | undefined>;
       const where: string[] = [];
       const params: unknown[] = [];
-      for (const col of ["genre", "directors", "stars"] as const) {
-        const value = q[col];
+      for (const [col, value] of [
+        ["genre", genre],
+        ["directors", directors],
+        ["stars", stars],
+      ] as const) {
         if (value) {
           params.push(`%${value}%`);
           where.push(`${col} ILIKE $${params.length}`);
         }
       }
-      const skip = Number(q.skip ?? 0);
-      const limit = Number(q.limit ?? 10);
       params.push(limit, skip);
       const { rows } = await db.query(
         `SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ${
@@ -146,7 +192,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       if (rows.length === 0) {
         return reply.code(404).send({ detail: "No movies found for matching criteria" });
       }
-      logger.info({ len: rows.length, genre: q.genre }, "Filtered movies");
+      logger.info({ len: rows.length, genre }, "Filtered movies");
       return rows.map(toMovieResult);
     } catch (err) {
       logger.error({ err }, "Error fetching filtered movies");

@@ -15,11 +15,13 @@
     "embeddings:remote": "tsx scripts/generate-embeddings-remote.ts",
     "init:db": "tsx scripts/init-db.ts",
     "fetch:movies": "tsx scripts/fetch-movies.ts",
-    "check": "tsx scripts/check.ts"
+    "check": "tsx scripts/check.ts",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.84.3",
     "@fastify/cors": "^11.0.1",
+    "@fastify/rate-limit": "^11.2.0",
     "@huggingface/transformers": "^4.2.0",
     "csv-parse": "^7.0.2",
     "dotenv": "^17.2.3",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@types/node": "^24.10.0",
     "@types/pg": "^8.15.5",
+    "@vitest/coverage-v8": "^4.1.11",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
     "vitest": "^4.0.0"

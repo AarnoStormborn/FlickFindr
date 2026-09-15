@@ -56,11 +56,11 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 | **Trailers** | `pi-ingest/ingest/trailers.py`, detail page | Stored in the DB (not request-time TMDB); 25,096 movies; monthly Pi refresh; candidate scoring rejects sign-language versions / Shorts / promo spots |
 | **More Like This** | `/flicks/movie/:id/similar`, detail page | Genre-aware embedding neighbours, in a carousel with arrows |
 | **Discovery shelves** | `frontend/src/data/shelves.js` | Latest / Going Retro / Millennium + curated genre rows, with vote floors |
-| **Cinematic redesign** | `docs/FRONTEND_DESIGN_INSPIRATION.md` | Dark editorial palette, Bodoni/Inter, floating nav |
+| **Cinematic redesign** | `frontend/src/index.css` (tokens) · `docs/FRONTEND_DESIGN_INSPIRATION.md` (rationale) | Dark editorial palette, Bodoni Moda / Inter, floating nav. The CSS custom properties are the source of truth — the design doc predates the build and its sample hexes differ |
 | **Playful loading quips** | `frontend/src/components/LoadingQuips.jsx` | Two tiers; escalates at 6s to acknowledge Render cold starts |
 | **Concierge chat UI** | `frontend/src/pages/ChatPage.jsx`, `frontend/src/api/chat.js` | Streaming SSE chat at `/chat`; the agent curates its picks into movie cards |
 | **Infra** | `docs/workflow.md`, `deploy/`, `.github/workflows/` | feature → dev → main, main guard, path-aware CI/deploys, trailer timer |
-| **Tests** | `backend/tests`, `frontend/src/**/*.test.*` | 21 backend + 35 frontend; `npm audit` clean in both packages |
+| **Tests** | `backend/tests`, `frontend/src/**/*.test.*` | 98 backend + 104 frontend; coverage thresholds ratcheted in CI; `npm audit` clean in both packages |
 
 ---
 
@@ -85,23 +85,30 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 - For describe-the-plot searches, show *why* each result matched (matched plot
   snippet + similarity) — builds trust in the differentiator.
 
-### Conversational concierge (the wedge) — *live in dev*
+### Conversational concierge (the wedge) — *shipped*
 - `POST /chat` (SSE) streams the agent's reply **and the movies it found**,
   which render as clickable cards; frontend page at `/chat` ("Concierge" in the
-  nav).
-- The agent's provider is configured in `backend/pi-agent/models.json`.
-  Model choice is explicit — free models first, never the SDK's "first
-  available" (a 69-model catalog mixes in ~$50/M flagships).
+  nav). The transcript persists in localStorage across navigation and reloads.
 - The agent curates what's displayed via a `show_movies` tool, so cards match
-  its recommendations instead of raw search noise.
-- **Remaining:** set `COMMAND_CODE_API_KEY` on Render to enable it in
-  production. The Command Code *Provider API* needs a paid plan — the $1 Go
-  plan is API-blocked (`403 upgrade_required`); GOAT ($10/mo) is the cheapest
-  with API access, and the free models then cost $0 per token. A different free
-  provider needs only a new entry in `models.json`.
-- **Known limits:** free models are slower (a heavy query can approach the 120s
-  chat timeout) and cap at ~100 requests/day; they also ignore "no markdown"
-  instructions, which is why the UI sanitises markdown itself.
+  its recommendations instead of raw search noise, and the UI reveals the cards
+  only after the text finishes streaming.
+- Model choice is explicit across providers — DeepSeek → Groq → OpenRouter free
+  → Command Code → cheapest authenticated — never the SDK's "first available"
+  (a 69-model catalog mixes in ~$50/M flagships). A run that returns no text
+  retries with the next candidate, so an exhausted free tier degrades instead
+  of breaking.
+- **Still open:** no provider key is set on Render, so production reports
+  "The concierge isn't configured on this server yet." Add one of
+  `DEEPSEEK_API_KEY` / `GROQ_API_KEY` / `COMMAND_CODE_API_KEY` to the service
+  env to switch it on.
+- **Measured limits of free tiers:** a turn costs several model calls, so
+  per-minute token caps dominate — Groq free measured 36-165s per turn at
+  ~60% success, and Command Code's free models cap at ~100 requests/day. This
+  is why a cheap paid model is the sensible primary. Chat timeout is 240s
+  because slower providers were being aborted mid-loop, which looked like an
+  empty reply.
+- Free models also ignore "reply in plain prose" instructions, so the UI
+  renders light markdown itself (`RichText`) rather than trusting the model.
 
 ### Search relevance
 - Plot-language search (semantic/hybrid) returns thematically loose results for
@@ -115,10 +122,12 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 
 - **Reviews** — third-party ratings/reviews on the detail page (table stakes).
 - **Accounts + cloud sync** — move lists/history from localStorage to per-user
-  storage once multi-device use matters.
-- **Frontend coverage in CI** — coverage thresholds (config exists via
-  `npm run test:coverage`).
+  storage once multi-device use matters (the concierge transcript would move
+  with it).
 - **Watchlist notifications** — tell me when a saved film lands on a service.
+- **Coverage raise** — thresholds now sit a few points under the measured
+  baseline; lift them as the untested pages/components (`SearchPage`,
+  `MetadataForm`, `MovieListTable`) get covered.
 
 ---
 

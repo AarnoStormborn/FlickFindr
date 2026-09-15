@@ -44,8 +44,13 @@ interface RankableVideo extends TmdbVideo {
   published_at?: string;
 }
 
-/** Rank a TMDB video entry; higher is a better 'main trailer' candidate. */
-function trailerScore(v: RankableVideo): number {
+/**
+ * Rank a TMDB video entry; higher is a better 'main trailer' candidate.
+ *
+ * Exported for tests: this is the business logic that makes a stored trailer
+ * the *right* trailer instead of an ASL version, a Short, or a promo spot.
+ */
+export function trailerScore(v: RankableVideo): number {
   const name = v.name ?? "";
   let score = 0;
   if (v.type === "Trailer") score += 100;

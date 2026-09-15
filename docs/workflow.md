@@ -17,7 +17,7 @@ feature branch ──PR──▶ dev ──PR──▶ main ──▶ production
 - Never push directly to `main` (branch protection blocks it anyway).
 - Branch new work off `dev`, not `main`:
   `git checkout dev && git pull && git checkout -b feat/my-feature`
-- Open PRs **into `dev`**. CI (typecheck, tests, build) gates every PR.
+- Open PRs **into `dev`**. CI (typecheck, tests + coverage thresholds, build) gates every PR.
 - Promote to production by opening a PR `dev → main` (release).
 - After a release, resync `dev` to `main` — squash merges rewrite commits, so
 the two branches converge in content but not in history:
