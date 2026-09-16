@@ -97,10 +97,13 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   (a 69-model catalog mixes in ~$50/M flagships). A run that returns no text
   retries with the next candidate, so an exhausted free tier degrades instead
   of breaking.
-- **Still open:** no provider key is set on Render, so production reports
-  "The concierge isn't configured on this server yet." Add one of
-  `DEEPSEEK_API_KEY` / `GROQ_API_KEY` / `COMMAND_CODE_API_KEY` to the service
-  env to switch it on.
+- **Live in production:** provider keys are set on Render and DeepSeek is
+  funded. Verified end-to-end from the Vercel origin: 17s cold-start turn, 5
+  curated cards, no errors. Measured on DeepSeek once warm: 7-9s per turn,
+  always on attempt 0 (no fallback retries), ~$0.003-0.01 per turn.
+- **Spend exposure:** the only guard is the per-IP rate limit (8 chat turns/min).
+  There is no global daily cap, so a determined abuser on many IPs could drain
+  the provider balance. Balance is currently small, which is its own limit.
 - **Measured limits of free tiers:** a turn costs several model calls, so
   per-minute token caps dominate — Groq free measured 36-165s per turn at
   ~60% success, and Command Code's free models cap at ~100 requests/day. This
