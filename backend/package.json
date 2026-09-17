@@ -16,6 +16,7 @@
     "init:db": "tsx scripts/init-db.ts",
     "fetch:movies": "tsx scripts/fetch-movies.ts",
     "check": "tsx scripts/check.ts",
+    "backfill:languages": "tsx scripts/backfill-languages.ts",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

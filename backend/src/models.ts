@@ -23,6 +23,8 @@ export const StructuralSearchRequestSchema = z.object({
   min_year: z.number().int().min(1880).max(2100).optional(),
   max_year: z.number().int().min(1880).max(2100).optional(),
   min_votes: z.number().int().min(0).optional(),
+  /** TMDB `original_language` code, e.g. "en", "hi", "fr". */
+  language: z.string().min(2).max(8).optional(),
   sort_by: SortBySchema,
   sort_order: SortOrderSchema,
   skip: z.number().int().min(0).default(0),
@@ -42,6 +44,7 @@ export const HybridSearchRequestSchema = z.object({
   genre: z.string().min(1).optional(),
   directors: z.string().min(1).optional(),
   stars: z.string().min(1).optional(),
+  language: z.string().min(2).max(8).optional(),
   min_rating: z.number().min(0).max(10).optional(),
   max_rating: z.number().min(0).max(10).optional(),
   min_runtime: z.number().int().min(0).optional(),
@@ -56,6 +59,7 @@ export interface MovieRow {
   id: number;
   movie_name: string;
   release_year: number | null;
+  original_language: string | null;
   rating: number | null;
   runtime: number | null;
   genre: string | null;
@@ -102,6 +106,12 @@ export interface MovieStats {
 
 export interface GenreItem {
   name: string;
+  count: number;
+}
+
+/** A language facet entry: TMDB `original_language` code + how many films. */
+export interface LanguageItem {
+  code: string;
   count: number;
 }
 

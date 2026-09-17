@@ -1,6 +1,7 @@
 import { logger } from "../logger.js";
 import type {
   GenreItem,
+  LanguageItem,
   MovieResult,
   MovieRow,
   MovieStats,
@@ -8,8 +9,8 @@ import type {
   StructuralSearchRequest,
 } from "../models.js";
 
-export const MOVIE_COLUMNS = `id, movie_name, release_year, rating, runtime, genre, metascore, plot,
-  directors, stars, votes, gross, poster_url`;
+export const MOVIE_COLUMNS = `id, movie_name, release_year, original_language, rating, runtime, genre,
+  metascore, plot, directors, stars, votes, gross, poster_url`;
 
 function toMovieResult(row: Record<string, unknown>): MovieResult {
   return {
@@ -26,6 +27,10 @@ function toMovieResult(row: Record<string, unknown>): MovieResult {
     votes: row.votes === null ? null : String(row.votes),
     gross: row.gross === null ? null : String(row.gross),
     poster_url: row.poster_url === null ? null : String(row.poster_url),
+    original_language:
+      row.original_language === null || row.original_language === undefined
+        ? null
+        : String(row.original_language),
     similarity_score:
       "similarity_score" in row && row.similarity_score !== null
         ? Number(row.similarity_score)
@@ -91,6 +96,13 @@ export function buildStructuralQuery(req: StructuralSearchRequest): StructuralQu
     whereParams.push(req.min_votes);
     where.push(`NULLIF(votes, '')::int >= $${whereParams.length}`);
   }
+  if (req.language) {
+    // Exact, case-insensitive code match. Rows whose language was never
+    // resolved (original_language IS NULL) are excluded, which is correct:
+    // asking for French films should not surface unknowns.
+    whereParams.push(req.language.toLowerCase());
+    where.push(`lower(original_language) = $${whereParams.length}`);
+  }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const order = req.sort_order === "desc" ? "DESC" : "ASC";
@@ -153,6 +165,28 @@ export const structuralService = {
   },
 
   /** Rating/runtime extents + total count, for the filter UI. */
+  /** Language facet: TMDB codes with counts, most common first. */
+  async getLanguages(db: Queryable): Promise<LanguageItem[]> {
+    try {
+      const { rows } = await db.query(
+        `SELECT original_language AS code, count(*)::int AS count
+           FROM movies
+          WHERE original_language IS NOT NULL
+          GROUP BY 1
+          ORDER BY count DESC`,
+      );
+      return rows
+        // `String(null)` is "null" — a truthy string — so check the raw value
+        // before coercing, or unknown rows appear as a language called "null".
+        .filter((r) => r.code !== null && r.code !== undefined && String(r.code).trim() !== "")
+        .map((r) => ({ code: String(r.code).trim(), count: Number(r.count) }))
+        .filter((r) => r.count > 0);
+    } catch (err) {
+      logger.error({ err }, "Failed to get languages");
+      throw err;
+    }
+  },
+
   async getStats(db: Queryable): Promise<MovieStats> {
     try {
       const { rows } = await db.query(

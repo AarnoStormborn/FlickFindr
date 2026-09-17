@@ -56,6 +56,7 @@ export function toAgentRow(row: Record<string, unknown>): Record<string, unknown
     rating: row?.rating ?? null,
     runtime: row?.runtime ?? null,
     genre: row?.genre ?? null,
+    original_language: row?.original_language ?? null,
     plot: plot
       ? plot.length > PLOT_SNIPPET_CHARS
         ? `${plot.slice(0, PLOT_SNIPPET_CHARS).trimEnd()}\u2026`
@@ -145,6 +146,9 @@ Style rules (the UI renders plain text, not markdown):
 - Do not prefix your reply with narration about searching, e.g. "Let me search..."; just answer.
 - Name each recommendation as "Title (Year)" followed by one or two sentences on why it fits.
 - Recommend at most 5 movies, and never mention a movie the tools did not return.
+- Movies carry an original_language code (en, fr, hi, ja, and so on). When the user names a language
+  or film industry, pass the language filter to the search tools rather than guessing from titles,
+  and say plainly if a language filter leaves no good matches.
 
 Curation: once you have decided which movies to recommend, call show_movies with their ids so
 the UI can display them. Search results alone are noisy — only pass the ones you actually
@@ -187,6 +191,7 @@ export function buildChatTools(
         genre: Type.Optional(Type.String()),
         directors: Type.Optional(Type.String()),
         stars: Type.Optional(Type.String()),
+        language: Type.Optional(Type.String({ description: "TMDB original_language code, e.g. 'en', 'fr', 'hi', 'ja', 'ko'. Use when the user names a language or film industry: 'French films' => fr; 'not Bollywood' => pass hi and exclude it." })),
         min_rating: Type.Optional(Type.Number()),
         max_rating: Type.Optional(Type.Number()),
         min_runtime: Type.Optional(Type.Number()),
@@ -204,6 +209,7 @@ export function buildChatTools(
           genre: params.genre,
           directors: params.directors,
           stars: params.stars,
+          language: params.language,
           min_rating: params.min_rating,
           max_rating: params.max_rating,
           min_runtime: params.min_runtime,
@@ -246,6 +252,7 @@ export function buildChatTools(
         genre: Type.Optional(Type.String()),
         directors: Type.Optional(Type.String()),
         stars: Type.Optional(Type.String()),
+        language: Type.Optional(Type.String({ description: "TMDB original_language code, e.g. 'en', 'fr', 'hi', 'ja', 'ko'. Use when the user names a language or film industry: 'French films' => fr; 'not Bollywood' => pass hi and exclude it." })),
         min_rating: Type.Optional(Type.Number()),
         max_rating: Type.Optional(Type.Number()),
         min_runtime: Type.Optional(Type.Number()),
@@ -255,7 +262,7 @@ export function buildChatTools(
       execute: async (_id, params) => {
         const result = await semanticService.hybridSearch(
           db,
-          { query: params.query, limit: params.limit ?? 10, genre: params.genre, directors: params.directors, stars: params.stars, min_rating: params.min_rating, max_rating: params.max_rating, min_runtime: params.min_runtime, max_runtime: params.max_runtime },
+          { query: params.query, limit: params.limit ?? 10, genre: params.genre, directors: params.directors, stars: params.stars, language: params.language, min_rating: params.min_rating, max_rating: params.max_rating, min_runtime: params.min_runtime, max_runtime: params.max_runtime },
           embed,
         );
         surface(result);
