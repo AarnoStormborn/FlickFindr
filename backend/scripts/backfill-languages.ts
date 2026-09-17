@@ -35,7 +35,25 @@ const REQUEST_DELAY_MS = Number(process.env.TMDB_REQUEST_DELAY_MS ?? 200);
 const MIN_VOTE_COUNT = process.env.MIN_VOTE_COUNT ?? "50";
 const START_YEAR = Number(process.env.START_YEAR ?? 1980);
 const END_YEAR = Number(process.env.END_YEAR ?? new Date().getFullYear());
-const PROGRESS_FILE = path.resolve(process.cwd(), ".data", "language-progress.json");
+/**
+ * Checkpoint file, namespaced by database host.
+ *
+ * Keyed only by year, a single shared file makes a second target skip its own
+ * backfill entirely: after finishing locally, every year is already marked
+ * complete, so pointing the script at another database would write nothing and
+ * report success. Deriving the name from the connection keeps each target's
+ * progress independent.
+ */
+function progressFile(): string {
+  let slug = "local";
+  try {
+    const host = new URL(process.env.DATABASE_URL ?? "").host;
+    if (host) slug = host.replace(/[^a-zA-Z0-9.]/g, "_");
+  } catch {
+    /* no DATABASE_URL -> local docker defaults */
+  }
+  return path.resolve(process.cwd(), ".data", `language-progress-${slug}.json`);
+}
 const FILL_REMAINDER = process.argv.includes("--fill");
 
 if (!API_KEY) {
@@ -97,7 +115,7 @@ interface Progress {
 }
 function loadProgress(): Progress {
   try {
-    const p = JSON.parse(fs.readFileSync(PROGRESS_FILE, "utf8"));
+    const p = JSON.parse(fs.readFileSync(progressFile(), "utf8"));
     return { completedYears: Array.isArray(p.completedYears) ? p.completedYears : [] };
   } catch {
     return { completedYears: [] };
@@ -105,8 +123,8 @@ function loadProgress(): Progress {
 }
 function saveProgress(p: Progress): void {
   try {
-    fs.mkdirSync(path.dirname(PROGRESS_FILE), { recursive: true });
-    fs.writeFileSync(PROGRESS_FILE, JSON.stringify(p));
+    fs.mkdirSync(path.dirname(progressFile()), { recursive: true });
+    fs.writeFileSync(progressFile(), JSON.stringify(p));
   } catch (err) {
     logger.warn({ err }, "could not write progress file");
   }
