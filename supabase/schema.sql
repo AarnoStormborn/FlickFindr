@@ -23,11 +23,17 @@ create table if not exists movies (
   plot_embedding vector(384),
   trailer_key text,
   trailer_source text,
-  trailer_checked boolean not null default false
+  trailer_checked boolean not null default false,
+  -- TMDB `original_language` (2-letter ISO code, e.g. 'en', 'hi', 'fr').
+  -- Nullable: rows predating the backfill, and any movie TMDB no longer
+  -- reports, stay NULL and are treated as "unknown" by the language filter.
+  original_language text
 );
 
 create unique index if not exists idx_movies_tmdb_id on movies (tmdb_id);
 create index if not exists idx_movies_name on movies (movie_name);
+-- Language is a common filter combined with sort-by-rating, so index it.
+create index if not exists idx_movies_language on movies (original_language);
 
 -- Optional but recommended for vector search speed at 30k rows.
 create index if not exists idx_movies_embedding

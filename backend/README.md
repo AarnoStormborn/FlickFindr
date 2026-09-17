@@ -61,6 +61,7 @@ No `.env` is required at boot — config ships dev defaults matching
 | `npm run fetch:movies` | TMDB 1980→now (vote_count≥50), resume-safe upsert |
 | `npm run ingest -- <csv>` | load movies CSV (quote-aware) |
 | `npm run embeddings` | batch plot embeddings → plot_embedding |
+| `npm run backfill:languages` | fill `original_language` from TMDB (resumable; `-- --fill` for the per-movie remainder) |
 | `npm run check` | env/catalog/agent health report |
 
 ## Agent mode
@@ -99,11 +100,12 @@ No `.env` is required at boot — config ships dev defaults matching
 | GET | `/` | Health |
 | GET | `/flicks/` | Paginated movie list |
 | GET | `/flicks/movie/:id` | Movie by id |
-| GET | `/flicks/filter` | Filter by genre/directors/stars |
+| GET | `/flicks/filter` | Filter by genre/directors/stars/language |
 | POST | `/search/structural` | Filters, sort, pagination |
 | POST | `/search/semantic` | NL plot search (agent-parsed) |
 | POST | `/search/hybrid` | Filters + semantic ranking (agent-parsed) |
 | GET | `/search/genres` | Genre facets |
+| GET | `/search/languages` | Language facets (`{code, count}`, most common first) |
 | GET | `/search/stats` | Rating/runtime extents, count |
 | POST | `/chat` | SSE agent chat `{ message, history? }` |
 

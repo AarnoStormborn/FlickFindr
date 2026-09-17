@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getMovieById, getMovieTrailers, getSimilarMovies } from '../api/movies';
 import MovieCarousel from '../components/MovieCarousel';
 import AddToListButton from '../components/AddToListButton';
+import { languageName } from '../lib/languages';
 import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
 import LoadingQuips from '../components/LoadingQuips';
@@ -140,6 +141,11 @@ export default function MovieDetailsPage() {
                                         <path d="M12 6v6l4 2" />
                                     </svg>
                                     {formatRuntime(movie.runtime)}
+                                </div>
+                            )}
+                            {movie.original_language && (
+                                <div className="meta-item" title="Original language">
+                                    {languageName(movie.original_language)}
                                 </div>
                             )}
                             {movie.metascore && movie.metascore > 0 && (

@@ -54,6 +54,18 @@ export function searchRoutes(app: FastifyInstance, deps: SearchDeps): void {
     }
   });
 
+  // Language facet for the filter UI. TMDB returns codes ("en", "hi"); the
+  // human-readable names are a presentation concern, so they live in the
+  // frontend rather than being duplicated into the API.
+  app.get("/search/languages", async (_request, reply) => {
+    try {
+      return await structuralService.getLanguages(db);
+    } catch (err) {
+      logger.error({ err }, "Failed to get languages");
+      return reply.code(500).send({ detail: "Failed to retrieve languages" });
+    }
+  });
+
   app.get("/search/stats", async (_request, reply) => {
     try {
       return await structuralService.getStats(db);

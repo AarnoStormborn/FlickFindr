@@ -4,7 +4,7 @@ import { toMovieResult } from "./structural.js";
 
 export const SIMILARITY_THRESHOLD = 0.6;
 
-const SIMILARITY_SELECT = `${"id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url"},\n  1 - (plot_embedding <=> CAST($1 AS vector)) AS similarity_score`;
+const SIMILARITY_SELECT = `${"id, movie_name, release_year, original_language, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url"},\n  1 - (plot_embedding <=> CAST($1 AS vector)) AS similarity_score`;
 
 function toSemanticResult(row: Record<string, unknown>): MovieResult {
   const movie = toMovieResult(row);
@@ -81,7 +81,7 @@ export const semanticService = {
    */
   async hybridSearch(
     db: Queryable,
-    req: { query: string; limit: number; skip?: number; genre?: string; directors?: string; stars?: string; min_rating?: number; max_rating?: number; min_runtime?: number; max_runtime?: number },
+    req: { query: string; limit: number; skip?: number; genre?: string; directors?: string; stars?: string; language?: string; min_rating?: number; max_rating?: number; min_runtime?: number; max_runtime?: number },
     getEmbedding: (text: string) => Promise<number[]>,
   ): Promise<{ movies: MovieResult[]; total: number; exact_matches: boolean; message: string }> {
     try {
@@ -108,6 +108,10 @@ export const semanticService = {
           addCond("directors", req.directors, "ILIKE", true);
           addCond("stars", req.stars, "ILIKE", true);
         }
+        // Language is deliberately outside `useCategorical`: relaxing it would
+        // put back exactly the films a viewer excluded by asking for one
+        // language, so a no-match answer is better than a wrong one.
+        addCond("lower(original_language)", req.language?.toLowerCase() ?? undefined, "=");
         addCond("rating", req.min_rating, ">=");
         addCond("rating", req.max_rating, "<=");
         addCond("runtime", req.min_runtime, ">=");
@@ -161,7 +165,7 @@ export const semanticService = {
     // dramas). Require sharing at least one genre token with the source
     // movie, then rank by embedding similarity — keeps results topical.
     const cols =
-      "id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url";
+      "id, movie_name, release_year, original_language, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url";
     const sql = `WITH src AS (SELECT id, genre, plot_embedding FROM movies WHERE id = $1)
       SELECT m.${cols.replaceAll(", ", ", m.")},
         1 - (m.plot_embedding <=> src.plot_embedding) AS similarity_score

@@ -57,6 +57,7 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 | **More Like This** | `/flicks/movie/:id/similar`, detail page | Genre-aware embedding neighbours, in a carousel with arrows |
 | **Discovery shelves** | `frontend/src/data/shelves.js` | Latest / Going Retro / Millennium + curated genre rows, with vote floors |
 | **Cinematic redesign** | `frontend/src/index.css` (tokens) · `docs/FRONTEND_DESIGN_INSPIRATION.md` (rationale) | Dark editorial palette, Bodoni Moda / Inter, floating nav. The CSS custom properties are the source of truth — the design doc predates the build and its sample hexes differ |
+| **Language filter** | `backend/scripts/backfill-languages.ts`, `frontend/src/lib/languages.js` | `original_language` for 30,749/30,749 films (88 languages) from a segmented TMDB `/discover` sweep (~3.3k requests, not ~31k per-movie lookups); filter on search + filter form, and the agent honours "only French films" |
 | **Playful loading quips** | `frontend/src/components/LoadingQuips.jsx` | Two tiers; escalates at 6s to acknowledge Render cold starts |
 | **Concierge chat UI** | `frontend/src/pages/ChatPage.jsx`, `frontend/src/api/chat.js` | Streaming SSE chat at `/chat`; the agent curates its picks into movie cards |
 | **Infra** | `docs/workflow.md`, `deploy/`, `.github/workflows/` | feature → dev → main, main guard, path-aware CI/deploys, trailer timer |
@@ -97,10 +98,13 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   (a 69-model catalog mixes in ~$50/M flagships). A run that returns no text
   retries with the next candidate, so an exhausted free tier degrades instead
   of breaking.
-- **Still open:** no provider key is set on Render, so production reports
-  "The concierge isn't configured on this server yet." Add one of
-  `DEEPSEEK_API_KEY` / `GROQ_API_KEY` / `COMMAND_CODE_API_KEY` to the service
-  env to switch it on.
+- **Live in production:** provider keys are set on Render and DeepSeek is
+  funded. Verified end-to-end from the Vercel origin: 17s cold-start turn, 5
+  curated cards, no errors. Measured on DeepSeek once warm: 7-9s per turn,
+  always on attempt 0 (no fallback retries), ~$0.003-0.01 per turn.
+- **Spend exposure:** the only guard is the per-IP rate limit (8 chat turns/min).
+  There is no global daily cap, so a determined abuser on many IPs could drain
+  the provider balance. Balance is currently small, which is its own limit.
 - **Measured limits of free tiers:** a turn costs several model calls, so
   per-minute token caps dominate — Groq free measured 36-165s per turn at
   ~60% success, and Command Code's free models cap at ~100 requests/day. This
@@ -109,6 +113,18 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   empty reply.
 - Free models also ignore "reply in plain prose" instructions, so the UI
   renders light markdown itself (`RichText`) rather than trusting the model.
+
+### Language filtering
+- A viewer asked why they could not exclude films they cannot understand: the
+  catalogue mixed world cinema into every list. The data did not exist — the
+  ingest only ever passed TMDB `language=en-US` as a *response* locale, so plots
+  came back in English while the film's own language was never stored.
+- Backfilled from TMDB by paging `/discover` per release year (20 films per
+  request, each already carrying `original_language`) rather than 30,749
+  per-movie lookups: ~3.3k requests, resumable per year.
+- **Language is a hard filter.** Hybrid search relaxes genre/directors/stars
+  when the strict conjunction is empty, and language deliberately sits outside
+  that: relaxing it would hand back the exact films the viewer excluded.
 
 ### Search relevance
 - Plot-language search (semantic/hybrid) returns thematically loose results for
