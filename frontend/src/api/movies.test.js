@@ -161,3 +161,48 @@ describe('endpoint helpers', () => {
     expect(body).toEqual({ query: 'prison escape', limit: 20, skip: 40 });
   });
 });
+
+describe('language filter and facet', () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(() => jsonResponse({ results: [], total: 0, skip: 0, limit: 20, has_more: false }));
+  });
+
+  it('sends the language filter in a structural search', async () => {
+    const api = await loadApi();
+    await api.searchMovies({ language: 'fr', limit: 10 });
+    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(body.language).toBe('fr');
+  });
+
+  it('omits language entirely when not chosen (so nothing is hidden)', async () => {
+    const api = await loadApi();
+    await api.searchMovies({ limit: 10 });
+    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(body).not.toHaveProperty('language');
+  });
+
+  it('sends the language filter in a hybrid search', async () => {
+    globalThis.fetch = vi.fn(() => jsonResponse({ results: [], total: 0, skip: 0, limit: 20, has_more: false }));
+    const api = await loadApi();
+    await api.hybridSearch({ query: 'quiet drama', language: 'ja', limit: 20 });
+    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(body.language).toBe('ja');
+  });
+
+  it('fetches the language facet once and serves repeats from cache', async () => {
+    const facet = [{ code: 'en', count: 17856 }, { code: 'fr', count: 2476 }];
+    globalThis.fetch = vi.fn(() => jsonResponse(facet));
+    const api = await loadApi();
+
+    expect(await api.getLanguages()).toEqual(facet);
+    expect(await api.getLanguages()).toEqual(facet);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(String(globalThis.fetch.mock.calls[0][0])).toContain('/search/languages');
+  });
+
+  it('rejects a non-array facet response', async () => {
+    globalThis.fetch = vi.fn(() => jsonResponse({ nope: true }));
+    const api = await loadApi();
+    await expect(api.getLanguages()).rejects.toThrow(/languages/i);
+  });
+});

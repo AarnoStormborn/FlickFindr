@@ -91,6 +91,18 @@ export async function getGenres() {
 }
 
 /**
+ * Fetch the language facet (TMDB codes + counts, most common first).
+ */
+export async function getLanguages() {
+    return cachedFetch(keyOf(['languages']), () =>
+        fetchJson(`${API_BASE_URL}/search/languages`).then((d) => {
+            if (!Array.isArray(d)) throw new Error('Failed to fetch languages');
+            return d;
+        }),
+    );
+}
+
+/**
  * Fetch movie statistics
  */
 export async function getStats() {
@@ -111,6 +123,7 @@ export async function searchMovies(params = {}) {
     if (params.genre) body.genre = params.genre;
     if (params.directors) body.directors = params.directors;
     if (params.stars) body.stars = params.stars;
+    if (params.language) body.language = params.language;
     if (params.minRating != null) body.min_rating = params.minRating;
     if (params.maxRating != null) body.max_rating = params.maxRating;
     if (params.minRuntime != null) body.min_runtime = params.minRuntime;
@@ -185,6 +198,7 @@ export async function hybridSearch(params) {
     if (params.genre) body.genre = params.genre;
     if (params.directors) body.directors = params.directors;
     if (params.stars) body.stars = params.stars;
+    if (params.language) body.language = params.language;
     if (params.minRating != null) body.min_rating = params.minRating;
     if (params.maxRating != null) body.max_rating = params.maxRating;
     if (params.minRuntime != null) body.min_runtime = params.minRuntime;

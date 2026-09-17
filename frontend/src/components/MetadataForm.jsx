@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { languageOptionLabel, languageName } from '../lib/languages';
 import './MetadataForm.css';
 
 const YEARS = [];
@@ -8,11 +9,12 @@ for (let y = new Date().getFullYear(); y >= 1980; y--) YEARS.push(y);
  * Structured filter form for the metadata search mode.
  * Submits a StructuralSearchRequest (no free-text search required).
  */
-export default function MetadataForm({ initial, onSearch }) {
+export default function MetadataForm({ initial, onSearch, languages = [] }) {
     const [title, setTitle] = useState(initial?.query || '');
     const [genre, setGenre] = useState(initial?.genre || '');
     const [actor, setActor] = useState(initial?.stars || '');
     const [director, setDirector] = useState(initial?.directors || '');
+    const [language, setLanguage] = useState(initial?.language || '');
     const [minYear, setMinYear] = useState(initial?.minYear ?? '');
     const [maxYear, setMaxYear] = useState(initial?.maxYear ?? '');
     const [minRating, setMinRating] = useState(initial?.minRating ?? '');
@@ -26,6 +28,7 @@ export default function MetadataForm({ initial, onSearch }) {
             genre: genre || undefined,
             stars: actor || undefined,
             directors: director || undefined,
+            language: language || undefined,
             minYear: minYear ? Number(minYear) : undefined,
             maxYear: maxYear ? Number(maxYear) : undefined,
             minRating: minRating ? Number(minRating) : undefined,
@@ -63,6 +66,22 @@ export default function MetadataForm({ initial, onSearch }) {
                         onChange={(e) => setActor(e.target.value)}
                         placeholder="e.g. Leonardo DiCaprio"
                     />
+                </label>
+                <label className="metadata-field">
+                    <span>Language</span>
+                    <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+                        <option value="">Any language</option>
+                        {(languages || []).map((entry) => (
+                            <option key={entry.code} value={entry.code}>
+                                {languageOptionLabel(entry)}
+                            </option>
+                        ))}
+                    </select>
+                    {language && (
+                        <small className="metadata-hint">
+                            Only {languageName(language)} titles
+                        </small>
+                    )}
                 </label>
                 <label className="metadata-field">
                     <span>Director</span>

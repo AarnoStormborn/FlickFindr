@@ -4,7 +4,8 @@ import MovieCard from '../components/MovieCard';
 import MovieListTable from '../components/MovieListTable';
 import ViewToggle from '../components/ViewToggle';
 import MetadataForm from '../components/MetadataForm';
-import { hybridSearch, semanticSearch, searchMovies } from '../api/movies';
+import { languageName } from '../lib/languages';
+import { getLanguages, hybridSearch, semanticSearch, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
 import useSearchHistory from '../hooks/useSearchHistory';
 import './SearchPage.css';
@@ -48,6 +49,7 @@ function filtersFromParams(searchParams) {
         genre: get('genre'),
         stars: get('actor'),
         directors: get('director'),
+        language: get('lang'),
         minYear: get('min_year') ? Number(get('min_year')) : undefined,
         maxYear: get('max_year') ? Number(get('max_year')) : undefined,
         minRating: get('min_rating') ? Number(get('min_rating')) : undefined,
@@ -63,6 +65,7 @@ function filtersLabel(f) {
         f.genre && `genre ${f.genre}`,
         f.stars && `actor ${f.stars}`,
         f.directors && `director ${f.directors}`,
+        f.language && `language ${languageName(f.language)}`,
         f.minYear && `since ${f.minYear}`,
         f.maxYear && `until ${f.maxYear}`,
         f.minRating && `${f.minRating}+ rating`,
@@ -72,7 +75,7 @@ function filtersLabel(f) {
 }
 
 function hasAnyFilter(f) {
-    return ['query', 'genre', 'stars', 'directors', 'minYear', 'maxYear', 'minRating'].some(
+    return ['query', 'genre', 'stars', 'directors', 'language', 'minYear', 'maxYear', 'minRating'].some(
         (k) => f[k] !== undefined,
     );
 }
@@ -95,6 +98,7 @@ export default function SearchPage() {
     const [meta, setMeta] = useState(null);
     const [searched, setSearched] = useState('');
     const [view, setView] = useViewMode();
+    const [languages, setLanguages] = useState([]);
     const { history, recordSearch, clearHistory } = useSearchHistory();
     const activeSearchRef = useRef(null); // descriptor for load-more
 
@@ -165,6 +169,7 @@ export default function SearchPage() {
             if (filters.minYear) params.minYear = filters.minYear;
             if (filters.maxYear) params.maxYear = filters.maxYear;
             if (filters.minRating) params.minRating = filters.minRating;
+            if (filters.language) params.language = filters.language;
             const data = await searchMovies(params);
             if (generationRef.current !== gen) return;
             setResults(data.results ?? []);
@@ -179,6 +184,7 @@ export default function SearchPage() {
             if (filters.genre) sp.set('genre', filters.genre);
             if (filters.stars) sp.set('actor', filters.stars);
             if (filters.directors) sp.set('director', filters.directors);
+        if (filters.language) sp.set('lang', filters.language);
             if (filters.minYear) sp.set('min_year', filters.minYear);
             if (filters.maxYear) sp.set('max_year', filters.maxYear);
             if (filters.minRating) sp.set('min_rating', filters.minRating);
@@ -256,6 +262,22 @@ export default function SearchPage() {
     }, [moreLoading, results.length]);
 
     // Drive searches purely from URL changes (navigation, back/forward, mode chip).
+    // Language facet for the filter form. Best-effort: if it fails the select
+    // simply offers only "Any language", and everything else still works.
+    useEffect(() => {
+        let cancelled = false;
+        getLanguages()
+            .then((list) => {
+                if (!cancelled) setLanguages(list);
+            })
+            .catch(() => {
+                if (!cancelled) setLanguages([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     useEffect(() => {
         setInput(queryFromUrl);
         if (mode === 'structural') {
@@ -285,6 +307,7 @@ export default function SearchPage() {
         if (filters.genre) sp.set('genre', filters.genre);
         if (filters.stars) sp.set('actor', filters.stars);
         if (filters.directors) sp.set('director', filters.directors);
+        if (filters.language) sp.set('lang', filters.language);
         if (filters.minYear) sp.set('min_year', filters.minYear);
         if (filters.maxYear) sp.set('max_year', filters.maxYear);
         if (filters.minRating) sp.set('min_rating', filters.minRating);
@@ -337,7 +360,12 @@ export default function SearchPage() {
                         <button type="submit" className="search-bar-button">Search</button>
                     </form>
                 ) : (
-                    <MetadataForm key={JSON.stringify(activeStructuralFilters || {})} initial={urlFilters} onSearch={submitStructural} />
+                    <MetadataForm
+                        key={JSON.stringify(activeStructuralFilters || {})}
+                        initial={urlFilters}
+                        languages={languages}
+                        onSearch={submitStructural}
+                    />
                 )}
 
                 <div className="search-modes">
