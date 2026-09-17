@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Queryable } from "../src/models.js";
 import { buildStructuralQuery, structuralService } from "../src/services/structural.js";
+import { buildApp } from "../src/app.js";
 import { semanticService } from "../src/services/semantic.js";
 
 /**
@@ -161,5 +162,35 @@ describe("hybrid search: language survives relaxation", () => {
     await semanticService.hybridSearch(db, { query: "cool hitman", limit: 5 }, embed);
     // The column list mentions original_language; the FILTER must not.
     expect(sqls.join(" ")).not.toContain("lower(original_language) =");
+  });
+});
+
+describe("detail endpoints expose original_language", () => {
+  /**
+   * Regression: flicks.ts carried three literal copies of the column list, and
+   * adding the language column only to the shared MOVIE_COLUMNS left all three
+   * of them returning original_language: null. The detail page showed no
+   * language while search returned it correctly — a silent, partial rollout.
+   * They now import the shared constant; this asserts the SQL they send.
+   */
+  it("selects the language column on /flicks and /flicks/movie/:id", async () => {
+    const sqls: string[] = [];
+    const db: Queryable = {
+      async query(sql: string) {
+        sqls.push(sql);
+        return { rows: [] };
+      },
+    };
+    const app = buildApp({ db, embed: async () => [], agentParse: async (q) => ({ query: q, skip: 0, limit: 10 }) });
+    await app.ready();
+    await app.inject({ method: "GET", url: "/flicks/?limit=5" });
+    await app.inject({ method: "GET", url: "/flicks/movie/1" });
+    await app.inject({ method: "GET", url: "/flicks/filter?genre=Drama" });
+    await app.close();
+
+    expect(sqls.length).toBeGreaterThanOrEqual(3);
+    for (const sql of sqls) {
+      expect(sql, sql).toContain("original_language");
+    }
   });
 });
