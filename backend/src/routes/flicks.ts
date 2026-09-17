@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { logger } from "../logger.js";
 import type { MovieResult, Queryable } from "../models.js";
-import { toMovieResult } from "../services/structural.js";
+import { MOVIE_COLUMNS, toMovieResult } from "../services/structural.js";
 import { semanticService } from "../services/semantic.js";
 import { getMovieVideos } from "../tmdb.js";
 
@@ -54,7 +54,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
     const { skip, limit } = parsed.data;
     try {
       const { rows } = await db.query(
-        "SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ORDER BY rating DESC NULLS LAST LIMIT $1 OFFSET $2",
+        `SELECT ${MOVIE_COLUMNS} FROM movies ORDER BY rating DESC NULLS LAST LIMIT $1 OFFSET $2`,
         [limit, skip],
       );
       if (rows.length === 0) return reply.code(404).send({ detail: "Movies not found" });
@@ -72,7 +72,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
     const movieId = parsedParams.data.movie_id;
     try {
       const { rows } = await db.query(
-        "SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies WHERE id = $1",
+        `SELECT ${MOVIE_COLUMNS} FROM movies WHERE id = $1`,
         [movieId],
       );
       if (rows.length === 0) {
@@ -184,7 +184,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       }
       params.push(limit, skip);
       const { rows } = await db.query(
-        `SELECT id, movie_name, release_year, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url FROM movies ${
+        `SELECT ${MOVIE_COLUMNS} FROM movies ${
           where.length ? `WHERE ${where.join(" AND ")}` : ""
         } ORDER BY rating DESC NULLS LAST LIMIT $${params.length - 1} OFFSET $${params.length}`,
         params,
