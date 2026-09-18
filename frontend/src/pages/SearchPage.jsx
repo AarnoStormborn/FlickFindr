@@ -102,7 +102,12 @@ export default function SearchPage() {
     const { history, recordSearch, clearHistory } = useSearchHistory();
     const activeSearchRef = useRef(null); // descriptor for load-more
 
-    const PAGE_SIZE = 30;
+    // 20 per page, and never past the top 100 — a ranked recommendation list
+    // does not need to page through all ~31k films. MAX_RESULTS mirrors the
+    // server's own cap (`MAX_RESULTS` in backend/src/models.ts), which rejects
+    // a skip beyond it; keep the two in step.
+    const PAGE_SIZE = 20;
+    const MAX_RESULTS = 100;
 
     // Monotonic generation: responses from an older mode/search are ignored.
     const generationRef = useRef(0);
@@ -218,6 +223,10 @@ export default function SearchPage() {
     const fetchMore = useCallback(async () => {
         const active = activeSearchRef.current;
         if (!active || moreLoading) return;
+        const cap = Math.min(typeof meta?.total === 'number' ? meta.total : MAX_RESULTS, MAX_RESULTS);
+        const remaining = cap - results.length;
+        if (remaining <= 0) return; // already showing the top 100
+        const limit = Math.min(PAGE_SIZE, remaining); // last page must not overshoot
         setMoreLoading(true);
         setError(null);
         try {
@@ -228,18 +237,18 @@ export default function SearchPage() {
                 data = await searchMovies({
                     ...active.filters,
                     skip,
-                    limit: PAGE_SIZE,
+                    limit,
                     sortBy: active.filters.sortBy,
                     sortOrder: active.filters.sortOrder,
                 });
             } else if (active.searchMode === 'semantic') {
-                data = await semanticSearch(active.query, PAGE_SIZE, skip);
+                data = await semanticSearch(active.query, limit, skip);
                 message = data.message;
             } else if (active.searchMode === 'hybrid') {
-                data = await hybridSearch({ query: active.query, limit: PAGE_SIZE, skip });
+                data = await hybridSearch({ query: active.query, limit, skip });
                 message = data.message;
             } else {
-                data = await searchMovies({ query: active.query, limit: PAGE_SIZE, skip, sortBy: 'rating', sortOrder: 'desc' });
+                data = await searchMovies({ query: active.query, limit, skip, sortBy: 'rating', sortOrder: 'desc' });
             }
             setResults((prev) => {
                 if (activeSearchRef.current !== active) return prev; // search changed mid-flight
@@ -259,7 +268,7 @@ export default function SearchPage() {
         } finally {
             setMoreLoading(false);
         }
-    }, [moreLoading, results.length]);
+    }, [moreLoading, results.length, meta?.total]);
 
     // Drive searches purely from URL changes (navigation, back/forward, mode chip).
     // Language facet for the filter form. Best-effort: if it fails the select
@@ -332,6 +341,8 @@ export default function SearchPage() {
 
     const showSearchBar = TEXT_MODES.includes(mode);
     const activeStructuralFilters = mode === 'structural' ? urlFilters : null;
+
+    const visibleTotal = Math.min(typeof meta?.total === 'number' ? meta.total : 0, MAX_RESULTS);
 
     return (
         <div className="search-page">
@@ -411,7 +422,11 @@ export default function SearchPage() {
                                     </p>
                                 )}
                                 {typeof meta.total === 'number' && (
-                                    <p className="search-message">{meta.total.toLocaleString()} matches</p>
+                                    <p className="search-message">
+                                        {meta.total > MAX_RESULTS
+                                            ? `Top ${MAX_RESULTS} of ${meta.total.toLocaleString()} matches`
+                                            : `${meta.total.toLocaleString()} matches`}
+                                    </p>
                                 )}
                             </div>
                             <ViewToggle view={view} onChange={setView} />
@@ -435,10 +450,10 @@ export default function SearchPage() {
                     <MovieListTable movies={results} emptyText="No movies matched that search." />
                 ))}
 
-                {!loading && !error && results.length > 0 && hasMore && (
+                {!loading && !error && results.length > 0 && hasMore && results.length < visibleTotal && (
                     <div className="search-more-row">
                         <button className="search-more-btn" onClick={fetchMore} disabled={moreLoading}>
-                            {moreLoading ? 'Loading…' : `Show more (${(meta?.total ?? 0) - results.length} more)`}
+                            {moreLoading ? 'Loading…' : `Show more (${visibleTotal - results.length} more)`}
                         </button>
                     </div>
                 )}

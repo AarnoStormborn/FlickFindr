@@ -11,6 +11,17 @@ export type SortByField = (typeof SortableFields)[number];
 export const SortOrderSchema = z.enum(["asc", "desc"]).default("desc");
 export const SortBySchema = z.enum(SortableFields).default("rating");
 
+/**
+ * How deep any single search may paginate.
+ *
+ * The catalogue is ~31k films, and the browse experience is a ranked
+ * recommendation list, not an index: paging past a few hundred results is never
+ * useful and invites scraping the whole table one page at a time. Callers may
+ * request at most this many results in total (skip must land inside the window);
+ * the UI surfaces "Top 100" rather than "30,749 matches".
+ */
+export const MAX_RESULTS = 100;
+
 export const StructuralSearchRequestSchema = z.object({
   query: z.string().min(1).optional(),
   genre: z.string().min(1).optional(),
@@ -27,14 +38,26 @@ export const StructuralSearchRequestSchema = z.object({
   language: z.string().min(2).max(8).optional(),
   sort_by: SortBySchema,
   sort_order: SortOrderSchema,
-  skip: z.number().int().min(0).default(0),
+  skip: z.number()
+    .int()
+    .min(0)
+    // Expressed as "the window", not "<=99": the default zod message for an
+    // off-by-one bound reads like a bug report rather than a product rule.
+    .max(MAX_RESULTS - 1, { message: `Pagination is capped at the first ${MAX_RESULTS} results` })
+    .default(0),
   limit: z.number().int().min(1).max(100).default(10),
 });
 export type StructuralSearchRequest = z.infer<typeof StructuralSearchRequestSchema>;
 
 export const SemanticSearchRequestSchema = z.object({
   query: z.string().min(3),
-  skip: z.number().int().min(0).default(0),
+  skip: z.number()
+    .int()
+    .min(0)
+    // Expressed as "the window", not "<=99": the default zod message for an
+    // off-by-one bound reads like a bug report rather than a product rule.
+    .max(MAX_RESULTS - 1, { message: `Pagination is capped at the first ${MAX_RESULTS} results` })
+    .default(0),
   limit: z.number().int().min(1).max(100).default(10),
 });
 export type SemanticSearchRequest = z.infer<typeof SemanticSearchRequestSchema>;
@@ -49,7 +72,13 @@ export const HybridSearchRequestSchema = z.object({
   max_rating: z.number().min(0).max(10).optional(),
   min_runtime: z.number().int().min(0).optional(),
   max_runtime: z.number().int().min(0).optional(),
-  skip: z.number().int().min(0).default(0),
+  skip: z.number()
+    .int()
+    .min(0)
+    // Expressed as "the window", not "<=99": the default zod message for an
+    // off-by-one bound reads like a bug report rather than a product rule.
+    .max(MAX_RESULTS - 1, { message: `Pagination is capped at the first ${MAX_RESULTS} results` })
+    .default(0),
   limit: z.number().int().min(1).max(100).default(10),
 });
 export type HybridSearchRequest = z.infer<typeof HybridSearchRequestSchema>;

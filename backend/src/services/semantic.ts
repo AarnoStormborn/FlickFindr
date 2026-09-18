@@ -128,7 +128,7 @@ export const semanticService = {
         const sql = `SELECT ${SIMILARITY_SELECT}
           FROM movies
           WHERE ${whereSql}
-          ORDER BY plot_embedding <=> CAST($1 AS vector)
+          ORDER BY plot_embedding <=> CAST($1 AS vector), id ASC
           LIMIT $${filterValues.length + 2} OFFSET $${filterValues.length + 3}`;
         const dataParams = [vec, ...filterValues, req.limit, skip];
 

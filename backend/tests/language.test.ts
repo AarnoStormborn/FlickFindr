@@ -194,3 +194,24 @@ describe("detail endpoints expose original_language", () => {
     }
   });
 });
+
+describe("pagination is deterministic", () => {
+  /**
+   * Regression found by paging a real search in the browser: pages came back
+   * 19/18/18/18 instead of 20/20/20/20. `ORDER BY rating DESC NULLS LAST` has
+   * no tiebreaker and ratings tie constantly, so Postgres is free to order tied
+   * rows differently per query — OFFSET pages then repeat some rows and skip
+   * others, and films quietly never appear at all.
+   */
+  it("breaks rating ties by id so OFFSET pages cannot overlap", () => {
+    const q = buildStructuralQuery({ sort_by: "rating", sort_order: "desc", skip: 20, limit: 20 });
+    expect(q.sql).toContain("ORDER BY rating DESC NULLS LAST, id ASC");
+  });
+
+  it("keeps the tiebreaker for other sort columns and directions", () => {
+    for (const sort_by of ["runtime", "movie_name", "metascore", "release_year"] as const) {
+      const q = buildStructuralQuery({ sort_by, sort_order: "asc", skip: 0, limit: 20 });
+      expect(q.sql, sort_by).toContain(", id ASC");
+    }
+  });
+});
