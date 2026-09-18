@@ -234,4 +234,28 @@ describe("FlickFindr API (injected deps)", () => {
             expect(codes).toContain(429); // and a burst is stopped
         });
     });
+
+    describe("pagination depth is capped (MAX_RESULTS)", () => {
+        it("accepts a page that lands inside the top 100", async () => {
+            const res = await app.inject({
+                method: "POST",
+                url: "/search/structural",
+                payload: { limit: 20, skip: 80 },
+            });
+            expect(res.statusCode).toBe(200);
+        });
+
+        it("rejects a skip beyond the cap instead of serving a 30k-deep page", async () => {
+            for (const url of ["/search/structural", "/search/semantic", "/search/hybrid"]) {
+                const res = await app.inject({ method: "POST", url, payload: { query: "a heist film", limit: 20, skip: 100 } });
+                expect(res.statusCode, url).toBe(400);
+                expect(JSON.stringify(res.json())).toMatch(/first 100 results/);
+            }
+        });
+
+        it("still allows the maximum page size from the very start", async () => {
+            const res = await app.inject({ method: "POST", url: "/search/structural", payload: { limit: 100, skip: 0 } });
+            expect(res.statusCode).toBe(200);
+        });
+    });
 });

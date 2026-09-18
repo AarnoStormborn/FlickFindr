@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SearchPage from './SearchPage';
@@ -66,5 +67,100 @@ describe('SearchPage forwards URL filters to the API', () => {
         await waitFor(() => expect(getLanguages).toHaveBeenCalled());
         // The select is populated from the facet fetched by the page.
         await waitFor(() => expect(screen.getByLabelText(/language/i)).toBeInTheDocument());
+    });
+});
+
+describe('SearchPage caps results at the top 100', () => {
+    /** 20 movies per page, unique ids, as the API would return them. */
+    const pageOf = (skip) =>
+        Array.from({ length: 20 }, (_, i) => ({
+            id: skip + i + 1,
+            movie_name: `Movie ${skip + i + 1}`,
+            original_language: 'en',
+            release_year: 2000,
+        }));
+
+    beforeEach(() => {
+        vi.mocked(searchMovies).mockImplementation(async (params = {}) => ({
+            results: pageOf(params.skip ?? 0),
+            total: 30749, // a search that matches the whole catalogue
+            skip: params.skip ?? 0,
+            limit: params.limit ?? 20,
+            has_more: true, // the server would happily serve 30k
+        }));
+    });
+
+    it('shows 20 on the first page, not 30', async () => {
+        renderAt('/search?mode=structural&genre=Drama');
+        await waitFor(() => expect(searchMovies).toHaveBeenCalled());
+        await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(20));
+        // The first page omits `skip` entirely (the API defaults it to 0).
+        const first = searchMovies.mock.calls[0][0];
+        expect(first.limit).toBe(20);
+        expect(first.skip ?? 0).toBe(0);
+    });
+
+    it('reports the capped total rather than "30,749 matches"', async () => {
+        renderAt('/search?mode=structural&genre=Drama');
+        await waitFor(() => expect(screen.getByText(/top 100 of 30,749 matches/i)).toBeInTheDocument());
+    });
+
+    it('reports the real total when it is under the cap', async () => {
+        vi.mocked(searchMovies).mockImplementation(async () => ({
+            results: pageOf(0),
+            total: 42,
+            skip: 0,
+            limit: 20,
+            has_more: true,
+        }));
+        renderAt('/search?mode=structural&genre=Drama');
+        await waitFor(() => expect(screen.getByText(/^42 matches$/)).toBeInTheDocument());
+    });
+
+    it('counts "more" against the cap, not the catalogue', async () => {
+        renderAt('/search?mode=structural&genre=Drama');
+        await waitFor(() => expect(screen.getByRole('button', { name: /show more/i })).toBeInTheDocument());
+        expect(screen.getByRole('button', { name: /show more/i })).toHaveTextContent('Show more (80 more)');
+    });
+
+    it('stops at 100 and never requests beyond the cap', async () => {
+        const user = userEvent.setup();
+        renderAt('/search?mode=structural&genre=Drama');
+        await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(20));
+
+        // Four more pages: 40, 60, 80, 100.
+        for (let expected = 40; expected <= 100; expected += 20) {
+            await user.click(screen.getByRole('button', { name: /show more/i }));
+            await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(expected));
+        }
+
+        // The offer is gone, and no request ever reached past the window.
+        expect(screen.queryByRole('button', { name: /show more/i })).toBeNull();
+        for (const [params] of searchMovies.mock.calls) {
+            expect((params.skip ?? 0) + (params.limit ?? 0)).toBeLessThanOrEqual(100);
+        }
+    });
+
+    it('does not overshoot the cap on the final page', async () => {
+        // A total just inside the cap: the last request must ask for the
+        // remainder, not a full page past the end.
+        vi.mocked(searchMovies).mockImplementation(async (params = {}) => {
+            const skip = params.skip ?? 0;
+            return {
+                results: pageOf(skip).slice(0, Math.max(0, Math.min(20, 100 - skip))),
+                total: 100,
+                skip,
+                limit: params.limit ?? 20,
+                has_more: true,
+            };
+        });
+        const user = userEvent.setup();
+        renderAt('/search?mode=structural&genre=Drama');
+        await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(20));
+
+        await user.click(screen.getByRole('button', { name: /show more/i }));
+        await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(40));
+        // 100 - 40 = 60 remaining, so pages continue 20 at a time to exactly 100.
+        expect(searchMovies.mock.calls.at(-1)[0]).toMatchObject({ limit: 20, skip: 20 });
     });
 });

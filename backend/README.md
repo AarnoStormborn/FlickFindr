@@ -107,6 +107,11 @@ No `.env` is required at boot — config ships dev defaults matching
 | GET | `/search/genres` | Genre facets |
 | GET | `/search/languages` | Language facets (`{code, count}`, most common first) |
 | GET | `/search/stats` | Rating/runtime extents, count |
+
+Pagination is capped at the **first 100 results** (`MAX_RESULTS`) for every
+search mode: `limit` is at most 100, and a `skip` landing outside that window is
+rejected with 400 rather than serving a 30k-deep page. The UI pages 20 at a time
+and stops at 100.
 | POST | `/chat` | SSE agent chat `{ message, history? }` |
 
 ## Tests
