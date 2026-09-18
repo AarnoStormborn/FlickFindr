@@ -54,7 +54,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
     const { skip, limit } = parsed.data;
     try {
       const { rows } = await db.query(
-        `SELECT ${MOVIE_COLUMNS} FROM movies ORDER BY rating DESC NULLS LAST LIMIT $1 OFFSET $2`,
+        `SELECT ${MOVIE_COLUMNS} FROM movies ORDER BY rating DESC NULLS LAST, id ASC LIMIT $1 OFFSET $2`,
         [limit, skip],
       );
       if (rows.length === 0) return reply.code(404).send({ detail: "Movies not found" });
@@ -186,7 +186,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       const { rows } = await db.query(
         `SELECT ${MOVIE_COLUMNS} FROM movies ${
           where.length ? `WHERE ${where.join(" AND ")}` : ""
-        } ORDER BY rating DESC NULLS LAST LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        } ORDER BY rating DESC NULLS LAST, id ASC LIMIT $${params.length - 1} OFFSET $${params.length}`,
         params,
       );
       if (rows.length === 0) {

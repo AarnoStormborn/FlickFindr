@@ -112,7 +112,7 @@ export function buildStructuralQuery(req: StructuralSearchRequest): StructuralQu
 
   return {
     sql: `SELECT ${MOVIE_COLUMNS} FROM movies ${whereSql}
-      ORDER BY ${sortColumn} ${order} NULLS LAST
+      ORDER BY ${sortColumn} ${order} NULLS LAST, id ASC
       LIMIT $${whereParams.length + 1} OFFSET $${whereParams.length + 2}`,
     params: [...whereParams, req.limit, req.skip],
     whereSql,
