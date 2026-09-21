@@ -404,6 +404,14 @@
         justify-content: center;
     }
 
+    /* The action row was the one thing the mobile layout left uncentred: the
+       surrounding sections centre via `text-align`, which does not move flex
+       items, so Save / Watch trailer stayed flush left while the rating above
+       and the genres below were centred. */
+    .movie-actions {
+        justify-content: center;
+    }
+
     .movie-genres {
         justify-content: center;
     }
