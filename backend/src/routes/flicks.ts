@@ -4,7 +4,7 @@ import { logger } from "../logger.js";
 import type { MovieResult, Queryable } from "../models.js";
 import { MOVIE_COLUMNS, toMovieResult } from "../services/structural.js";
 import { semanticService } from "../services/semantic.js";
-import { getMovieVideos } from "../tmdb.js";
+import { getMovieVideos, getWatchProviders } from "../tmdb.js";
 
 interface FlicksDeps {
   db: Queryable;
@@ -161,6 +161,57 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       };
     } catch (err) {
       logger.error({ err }, "Error fetching trailers");
+      return reply.code(500).send({ detail: "Internal Server Error" });
+    }
+  });
+
+  /**
+   * Where to watch, for the configured regions.
+   *
+   * Same shape as the trailers route: serve what we stored, otherwise ask TMDB
+   * once, persist, and serve that. A TMDB failure returns 503 and leaves
+   * providers_checked=false so a later visit retries — an outage must never be
+   * recorded as "nothing available" (which would be a permanent lie).
+   */
+  app.get("/flicks/movie/:movie_id/providers", async (request, reply) => {
+    const parsedParams = MovieIdParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return invalid(reply, parsedParams.error);
+    const movieId = parsedParams.data.movie_id;
+    try {
+      const { rows } = await db.query(
+        "SELECT tmdb_id, watch_providers, providers_checked FROM movies WHERE id = $1",
+        [movieId],
+      );
+      const row = rows[0];
+      if (!row) return reply.code(404).send({ detail: `Movie not found for ID: ${movieId}` });
+
+      const payload = (regions: unknown) => ({
+        regions,
+        attribution: { text: "Watch provider data provided by JustWatch", url: "https://www.justwatch.com" },
+      });
+
+      // 1. Already fetched -> serve the stored regions (possibly none).
+      if (row.providers_checked) {
+        return payload(Array.isArray(row.watch_providers) ? row.watch_providers : (row.watch_providers ?? []));
+      }
+
+      const tmdbId = Number(row.tmdb_id ?? 0);
+      if (!tmdbId) {
+        return payload([]);
+      }
+
+      // 2. First visit: ask TMDB (one request covers every region).
+      const { ok, regions } = await getWatchProviders(tmdbId);
+      if (!ok) {
+        return reply.code(503).send({ detail: "Watch provider service unavailable, try again" });
+      }
+      await db.query(
+        "UPDATE movies SET watch_providers = $1, providers_checked = true, providers_updated_at = now() WHERE id = $2",
+        [JSON.stringify(regions), movieId],
+      );
+      return payload(regions);
+    } catch (err) {
+      logger.error({ err }, "Error fetching watch providers");
       return reply.code(500).send({ detail: "Internal Server Error" });
     }
   });

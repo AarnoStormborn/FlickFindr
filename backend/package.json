@@ -17,6 +17,7 @@
     "fetch:movies": "tsx scripts/fetch-movies.ts",
     "check": "tsx scripts/check.ts",
     "backfill:languages": "tsx scripts/backfill-languages.ts",
+    "backfill:providers": "tsx scripts/backfill-providers.ts",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
