@@ -156,7 +156,10 @@ export default function MovieDetailsPage() {
                             )}
                         </div>
 
-                        {/* Actions: save to list + trailer */}
+                        {/* Body: content on the left, "where to watch" beside it */}
+                        <div className="movie-body">
+                            <div className="movie-body-main">
+                                {/* Actions: save to list + trailer */}
                         {(listsApi || trailers.length > 0) && movie && (
                             <div className="movie-actions">
                                 {listsApi && (
@@ -200,8 +203,6 @@ export default function MovieDetailsPage() {
                             </div>
                         )}
 
-                        <WhereToWatch movieId={movie.id} />
-
                         {/* Cast & Crew */}
                         <div className="movie-credits">
                             {movie.directors && (
@@ -232,6 +233,12 @@ export default function MovieDetailsPage() {
                                     <span className="extra-value">${movie.gross}</span>
                                 </div>
                             )}
+                        </div>
+                            </div>
+
+                            <aside className="movie-body-aside">
+                                <WhereToWatch movieId={movie.id} />
+                            </aside>
                         </div>
                     </div>
                 </div>

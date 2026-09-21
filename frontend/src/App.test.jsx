@@ -20,6 +20,11 @@ function routeFetch() {
       body = { id: 1, movie_name: 'Inception', release_year: 2010, rating: 8.4, genre: 'Action, Sci-Fi' };
     } else if (href.includes('/trailers') || href.includes('/similar')) {
       body = { results: [] };
+    } else if (href.includes('/providers')) {
+      body = {
+        regions: [{ code: 'IN', link: 'https://example.com/watch', flatrate: [{ id: 8, name: 'Prime', logo: null }], rent: [], buy: [] }],
+        attribution: { text: 'Watch provider data provided by JustWatch' },
+      };
     } else {
       body = { results: [], total: 0, skip: 0, limit: 20, has_more: false };
     }
@@ -59,6 +64,23 @@ describe('App routing', () => {
     renderAt('/movie/1');
     await waitFor(() => expect(screen.getByText('Inception')).toBeInTheDocument());
     expect(document.querySelector('.movie-details-page')).toBeTruthy();
+  });
+
+  it('places "where to watch" in the sidebar, not in the content flow', async () => {
+    // Structural guard for the layout: the section belongs in the aside beside
+    // the content, and CSS is what actually positions it.
+    renderAt('/movie/1');
+    await waitFor(() => expect(document.querySelector('.movie-details-page')).toBeTruthy());
+    // The section needs provider data to render at all.
+    await waitFor(() => expect(document.querySelector('.where-to-watch')).toBeTruthy());
+
+    const aside = document.querySelector('.movie-body-aside');
+    const main = document.querySelector('.movie-body-main');
+    expect(aside).toBeTruthy();
+    expect(main).toBeTruthy();
+    // Sidebar holds the section; the content column does not.
+    expect(aside.contains(document.querySelector('.where-to-watch'))).toBe(true);
+    expect(main.contains(document.querySelector('.where-to-watch'))).toBe(false);
   });
 
   it('renders the genre route', async () => {
