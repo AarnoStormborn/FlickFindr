@@ -186,8 +186,9 @@ describe("GET /flicks/movie/:id/providers", () => {
     expect(res.json().regions[0].code).toBe("US");
     expect(updates).toHaveLength(1);
     // The persisted JSON must mark the row as answered for.
-    expect(String(updates[0][0])).toContain("US");
-    expect(String(updates[0][1])).toBe("1");
+    const [firstUpdate] = updates;
+    expect(String(firstUpdate?.[0])).toContain("US");
+    expect(String(firstUpdate?.[1])).toBe("1");
   });
 
   it("persists an empty answer as genuinely 'nothing available'", async () => {
