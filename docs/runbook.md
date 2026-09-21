@@ -115,6 +115,29 @@ a permanent "no trailer".
 Refresh runs monthly on the Pi (`flickfindr-trailers.timer`); see
 `pi-ingest/README.md`.
 
+## 7. Where to watch (providers)
+
+```bash
+npm run backfill:providers                  # 1000 films (the default sample)
+npm run backfill:providers -- --limit 5000
+npm run backfill:providers -- --all         # whole catalogue
+```
+
+- **Per-film work**: one request each (`/movie/{id}/watch/providers`). Unlike
+  language, there is no bulk route and `/discover` carries no provider data.
+- That single request returns **all 112 regions**, so serving India and the US
+  costs no more than serving one. `WATCH_REGIONS` (default `IN,US`) decides which
+  are stored.
+- Roughly **1.8s per film** from this network, so 1,000 takes ~30 minutes and the
+  full catalogue is **~15 hours** single-threaded. Raise `--limit` when you want
+  more, and consider adding concurrency before attempting `--all`.
+- **No checkpoint file**: `providers_checked` on the row is the checkpoint, so it
+  is resumable and safe to interrupt. Failed lookups stay unchecked and are
+  retried on the next run; the job stops after 10 consecutive failures rather
+  than grinding against an outage.
+- The API also fetches on demand the first time a film's detail page is opened,
+  so anything the backfill has not reached still works.
+
 ## 7. Deploy
 
 - **Render** (API) and **Vercel** (frontend) — branch pins and the reason for

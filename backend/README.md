@@ -62,6 +62,7 @@ No `.env` is required at boot — config ships dev defaults matching
 | `npm run ingest -- <csv>` | load movies CSV (quote-aware) |
 | `npm run embeddings` | batch plot embeddings → plot_embedding |
 | `npm run backfill:languages` | fill `original_language` from TMDB (resumable; `-- --fill` for the per-movie remainder) |
+| `npm run backfill:providers` | fill `watch_providers` (India + US) from TMDB; `-- --limit N` or `--all` |
 | `npm run check` | env/catalog/agent health report |
 
 ## Agent mode
@@ -106,6 +107,7 @@ No `.env` is required at boot — config ships dev defaults matching
 | POST | `/search/hybrid` | Filters + semantic ranking (agent-parsed) |
 | GET | `/search/genres` | Genre facets |
 | GET | `/search/languages` | Language facets (`{code, count}`, most common first) |
+| GET | `/flicks/movie/:id/providers` | Where to watch (per-region Stream/Rent/Buy), cached in the DB |
 | GET | `/search/stats` | Rating/runtime extents, count |
 
 Pagination is capped at the **first 100 results** (`MAX_RESULTS`) for every
