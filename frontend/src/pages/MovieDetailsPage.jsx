@@ -4,6 +4,7 @@ import { getMovieById, getMovieTrailers, getSimilarMovies } from '../api/movies'
 import MovieCarousel from '../components/MovieCarousel';
 import AddToListButton from '../components/AddToListButton';
 import { languageName } from '../lib/languages';
+import WhereToWatch from '../components/WhereToWatch';
 import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
 import LoadingQuips from '../components/LoadingQuips';
@@ -198,6 +199,8 @@ export default function MovieDetailsPage() {
                                 <p>{movie.plot}</p>
                             </div>
                         )}
+
+                        <WhereToWatch movieId={movie.id} />
 
                         {/* Cast & Crew */}
                         <div className="movie-credits">
