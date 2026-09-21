@@ -60,4 +60,5 @@ gh pr create --base main --head dev --title "release: <summary>"
 ## Related
 
 - [`docs/roadmap.md`](roadmap.md) — positioning, what's shipped, what's next.
+- [`docs/runbook.md`](runbook.md) — rebuilding/verifying a database.
 - [`deploy/README.md`](../deploy/README.md) — provider setup and first deploy.

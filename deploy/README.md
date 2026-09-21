@@ -56,6 +56,9 @@ Browser
 > backend also pre-warms its embedding model in the background on boot, so warm
 > requests are fast.
 
+> Rebuilding or repairing the database, and verifying it afterwards:
+> [`docs/runbook.md`](../docs/runbook.md) (`npm run check --strict`).
+
 ## 3. Vercel (frontend)
 
 1. In Vercel: **Add New Project** → import repo → **Root Directory: `frontend`**.

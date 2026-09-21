@@ -27,7 +27,17 @@ create table if not exists movies (
   -- TMDB `original_language` (2-letter ISO code, e.g. 'en', 'hi', 'fr').
   -- Nullable: rows predating the backfill, and any movie TMDB no longer
   -- reports, stay NULL and are treated as "unknown" by the language filter.
-  original_language text
+  original_language text,
+  -- Where to watch, for the configured regions only, shaped:
+  --   { "IN": { link, flatrate: [{id,name,logo}], rent: [...], buy: [...] }, "US": {...} }
+  -- TMDB returns ~112 regions in ONE request; we keep the handful we serve so
+  -- a row stays a couple of KB. One fetch fills every region, so this is not
+  -- per-region work.
+  watch_providers jsonb,
+  -- Same rule as trailers: true means TMDB ANSWERED (even if it answered
+  -- "nothing available"). A failed fetch must stay false so it retries.
+  providers_checked boolean not null default false,
+  providers_updated_at timestamptz
 );
 
 create unique index if not exists idx_movies_tmdb_id on movies (tmdb_id);

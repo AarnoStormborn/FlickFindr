@@ -91,6 +91,18 @@ export async function getGenres() {
 }
 
 /**
+ * Where to watch (TMDB/JustWatch), for the regions the API is configured with.
+ * Not cached in the client: the server already stores the answer and this is a
+ * per-movie lookup, so a stale client copy would only hide updates.
+ */
+export async function getWatchProviders(id) {
+    return fetchJson(`${API_BASE_URL}/flicks/movie/${id}/providers`).then((d) => {
+        if (!Array.isArray(d?.regions)) throw new Error('Failed to fetch watch providers');
+        return d;
+    });
+}
+
+/**
  * Fetch the language facet (TMDB codes + counts, most common first).
  */
 export async function getLanguages() {

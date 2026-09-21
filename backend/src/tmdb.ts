@@ -7,6 +7,8 @@
 
 const API_KEY = (): string => process.env.TMDB_API_KEY ?? "";
 const BASE = "https://api.themoviedb.org/3";
+/** TMDB image CDN; we store provider logos as relative paths and expand them. */
+const TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h — videos rarely change
 
 export interface TmdbVideo {
@@ -21,7 +23,8 @@ export interface TrailerLookup {
   videos: TmdbVideo[];
 }
 
-const cache = new Map<string, { ts: number; value: TrailerLookup }>();
+/** Shared TTL cache for TMDB lookups (trailers, providers). */
+const cache = new Map<string, { ts: number; value: unknown }>();
 
 // Trailer selection quality filters (see getMovieVideos).
 // Hard skip: accessibility/localisation variants that are not the main trailer.
@@ -101,7 +104,7 @@ async function tmdbGet<T>(path: string, params: Record<string, string>): Promise
 export async function getMovieVideos(tmdbId: number): Promise<TrailerLookup> {
   const cacheKey = String(tmdbId);
   const hit = cache.get(cacheKey);
-  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.value;
+  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.value as TrailerLookup;
 
   const data = await tmdbGet<{ results?: (TmdbVideo & { official?: boolean; size?: number; iso_639_1?: string; iso_3166_1?: string; published_at?: string })[] }>(
     `/movie/${tmdbId}/videos`,
@@ -133,4 +136,99 @@ export async function getMovieVideos(tmdbId: number): Promise<TrailerLookup> {
 /** Clean up cache (mainly for tests). */
 export function clearTmdbCache(): void {
   cache.clear();
+}
+
+// ---------------------------------------------------------------- providers
+
+/** Regions we store. TMDB returns ~112 in one response; we keep the ones we serve. */
+export function configuredRegions(): string[] {
+  return (process.env.WATCH_REGIONS ?? "IN,US")
+    .split(",")
+    .map((r) => r.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+export interface WatchProvider {
+  id: number | null;
+  name: string;
+  logo: string | null;
+}
+export interface RegionProviders {
+  code: string;
+  link: string | null;
+  flatrate: WatchProvider[];
+  rent: WatchProvider[];
+  buy: WatchProvider[];
+}
+export interface ProvidersLookup {
+  ok: boolean; // true = TMDB answered (regions may be empty)
+  regions: RegionProviders[];
+}
+
+/** Raw TMDB shape (only the fields we use). */
+interface RawProvider {
+  provider_id?: number;
+  provider_name?: string;
+  logo_path?: string | null;
+}
+interface RawRegion {
+  link?: string;
+  flatrate?: RawProvider[];
+  rent?: RawProvider[];
+  buy?: RawProvider[];
+}
+
+/**
+ * Reduce a `/watch/providers` response to the regions we serve.
+ *
+ * One request returns every region, so this selects rather than filters by
+ * need: adding a region later needs no re-fetch of the catalogue, only a change
+ * to WATCH_REGIONS and a refresh.
+ *
+ * Logo paths are TMDB CDN relative; they are expanded here so the frontend does
+ * not have to know TMDB's image base.
+ */
+export function normalizeWatchProviders(
+  results: Record<string, RawRegion> | null | undefined,
+  regions: string[] = configuredRegions(),
+): RegionProviders[] {
+  const out: RegionProviders[] = [];
+  for (const code of regions) {
+    const raw = results?.[code];
+    if (!raw) continue;
+    const bucket = (list?: RawProvider[]): WatchProvider[] =>
+      (list ?? [])
+        .filter((p) => p && typeof p.provider_name === "string")
+        .map((p) => ({
+          id: typeof p.provider_id === "number" ? p.provider_id : null,
+          name: String(p.provider_name),
+          logo: p.logo_path ? `${TMDB_IMAGE_BASE}/w92${p.logo_path}` : null,
+        }));
+    const flatrate = bucket(raw.flatrate);
+    const rent = bucket(raw.rent);
+    const buy = bucket(raw.buy);
+    // A region with no offers at all is not worth storing.
+    if (!flatrate.length && !rent.length && !buy.length) continue;
+    out.push({ code, link: raw.link ?? null, flatrate, rent, buy });
+  }
+  return out;
+}
+
+/**
+ * Watch providers for a TMDB movie id.
+ *
+ * `ok: false` means TMDB was unreachable and the caller must NOT record the
+ * result as "nothing available" — same contract as getMovieVideos.
+ */
+export async function getWatchProviders(tmdbId: number): Promise<ProvidersLookup> {
+  const cacheKey = `providers:${tmdbId}`;
+  const hit = cache.get(cacheKey);
+  if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.value as ProvidersLookup;
+
+  const data = await tmdbGet<{ results?: Record<string, RawRegion> }>(`/movie/${tmdbId}/watch/providers`, {});
+  if (data === null) return { ok: false, regions: [] };
+
+  const value: ProvidersLookup = { ok: true, regions: normalizeWatchProviders(data.results) };
+  cache.set(cacheKey, { ts: Date.now(), value });
+  return value;
 }

@@ -57,6 +57,7 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 | **More Like This** | `/flicks/movie/:id/similar`, detail page | Genre-aware embedding neighbours, in a carousel with arrows |
 | **Discovery shelves** | `frontend/src/data/shelves.js` | Latest / Going Retro / Millennium + curated genre rows, with vote floors |
 | **Cinematic redesign** | `frontend/src/index.css` (tokens) · `docs/FRONTEND_DESIGN_INSPIRATION.md` (rationale) | Dark editorial palette, Bodoni Moda / Inter, floating nav. The CSS custom properties are the source of truth — the design doc predates the build and its sample hexes differ |
+| **Where to watch** | `backend/scripts/backfill-providers.ts`, `frontend/src/components/WhereToWatch.jsx` | TMDB/JustWatch providers per region (India + US, switchable); Stream/Rent/Buy on the detail page; on-demand fetch + cache, with a 1,000-film sample backfilled so far |
 | **Language filter** | `backend/scripts/backfill-languages.ts`, `frontend/src/lib/languages.js` | `original_language` for 30,749/30,749 films (88 languages) from a segmented TMDB `/discover` sweep (~3.3k requests, not ~31k per-movie lookups); filter on search + filter form, and the agent honours "only French films" |
 | **Playful loading quips** | `frontend/src/components/LoadingQuips.jsx` | Two tiers; escalates at 6s to acknowledge Render cold starts |
 | **Concierge chat UI** | `frontend/src/pages/ChatPage.jsx`, `frontend/src/api/chat.js` | Streaming SSE chat at `/chat`; the agent curates its picks into movie cards |
@@ -66,12 +67,6 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 ---
 
 ## Next up
-
-### Where to watch
-- TMDB `/watch/providers` per region → Netflix/Prime/etc. on the detail page.
-- Reuse the proven **trailer playbook**: Pi fetches → S3 parquet → DB load, so
-  there's zero request-time TMDB dependency. Needs a provider-refresh timer
-  alongside the existing trailer one.
 
 ### Surprise me
 - One button → a random highly-rated film; optional constraint (genre, under 2h).

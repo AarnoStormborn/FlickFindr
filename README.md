@@ -47,6 +47,7 @@ Free, managed stack — see [`deploy/README.md`](deploy/README.md):
 |---|---|
 | [`docs/roadmap.md`](docs/roadmap.md) | Positioning, what's shipped, what's next |
 | [`docs/workflow.md`](docs/workflow.md) | Branching model (feature → dev → main) and deploy targets |
+| [`docs/runbook.md`](docs/runbook.md) | Rebuilding/verifying a database, and the `npm run check --strict` gate |
 | [`docs/FRONTEND_DESIGN_INSPIRATION.md`](docs/FRONTEND_DESIGN_INSPIRATION.md) | Historical design rationale — **not** the current spec |
 | [`backend/README.md`](backend/README.md) | API surface, scripts, agent configuration |
 | [`pi-ingest/README.md`](pi-ingest/README.md) | Raspberry Pi ingestion + trailer refresh jobs |

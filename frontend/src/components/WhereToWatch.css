@@ -1,0 +1,121 @@
+/* "Where to watch" — provider availability on the movie detail page. */
+
+.where-to-watch {
+    margin-top: var(--space-xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--line-subtle);
+}
+
+.where-to-watch-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-md);
+}
+
+.where-to-watch-title {
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+/* Region switcher — small, quiet, out of the way of the title. */
+.where-to-watch-regions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.where-to-watch-region {
+    padding: 3px var(--space-sm);
+    background: transparent;
+    border: 1px solid var(--line-subtle);
+    border-radius: var(--radius-pill, 999px);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.where-to-watch-region:hover {
+    color: var(--text-primary);
+    border-color: var(--accent-gold);
+}
+
+.where-to-watch-region.active {
+    color: var(--text-primary);
+    border-color: var(--accent-gold);
+    background: var(--accent-gold-soft);
+}
+
+.where-to-watch-region:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+
+.where-to-watch-group {
+    margin-bottom: var(--space-md);
+}
+
+.where-to-watch-group-label {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-sm);
+}
+
+.where-to-watch-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.where-to-watch-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-xs);
+    background: var(--bg-card);
+    border: 1px solid var(--line-faint);
+    border-radius: var(--card-radius);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.where-to-watch-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.where-to-watch-empty {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    margin: 0;
+}
+
+.where-to-watch-attribution {
+    margin: var(--space-md) 0 0;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.where-to-watch-attribution a {
+    color: var(--text-muted);
+    text-decoration: underline;
+}
+
+.where-to-watch-attribution a:hover {
+    color: var(--text-secondary);
+}
