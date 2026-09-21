@@ -30,6 +30,8 @@ export const EXPECTED_COLUMNS = [
   "plot_embedding",
   "trailer_key",
   "trailer_checked",
+  "watch_providers",
+  "providers_checked",
 ] as const;
 
 /**
