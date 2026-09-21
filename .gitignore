@@ -7,3 +7,10 @@
 
 # Deploy secrets
 deploy/.env
+
+# Folder-sync conflict copies. This repo lives under a synced directory, and the
+# syncing service occasionally writes "name 2.ext" alongside a file that was
+# edited — stale snapshots that `git add -A` will happily commit. They are never
+# wanted, and one was once committed before being noticed.
+* 2.*
+* 2
