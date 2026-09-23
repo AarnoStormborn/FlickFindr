@@ -1,16 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import AddToListButton from './AddToListButton';
 import { useListsContext } from '../context/useListsContext';
+import { formatRuntime } from '../lib/format';
 import './MovieListTable.css';
 
 const FALLBACK_POSTER = 'https://via.placeholder.com/100x150?text=No+Poster';
-
-function formatRuntime(minutes) {
-    if (!minutes) return null;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-}
 
 function primaryGenre(genre) {
     if (!genre) return null;

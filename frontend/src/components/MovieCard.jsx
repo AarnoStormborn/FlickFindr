@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import AddToListButton from './AddToListButton';
+import { formatRuntime } from '../lib/format';
 import { useListsContext } from '../context/useListsContext';
 import './MovieCard.css';
 
@@ -19,13 +20,6 @@ export default function MovieCard({ movie }) {
     const posterSrc = poster_url || 'https://via.placeholder.com/300x450?text=No+Poster';
 
     // Format runtime to hours and minutes
-    const formatRuntime = (minutes) => {
-        if (!minutes) return null;
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-    };
-
     const handleClick = () => {
         navigate(`/movie/${id}`);
     };

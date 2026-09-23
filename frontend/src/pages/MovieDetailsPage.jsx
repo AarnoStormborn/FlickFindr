@@ -4,6 +4,7 @@ import { getMovieById, getMovieTrailers, getSimilarMovies } from '../api/movies'
 import MovieCarousel from '../components/MovieCarousel';
 import AddToListButton from '../components/AddToListButton';
 import { languageName } from '../lib/languages';
+import { formatMoney } from '../lib/format';
 import WhereToWatch from '../components/WhereToWatch';
 import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
@@ -222,10 +223,10 @@ export default function MovieDetailsPage() {
                                     <span className="extra-value">{movie.votes}</span>
                                 </div>
                             )}
-                            {movie.gross && (
+                            {formatMoney(movie.gross) && (
                                 <div className="extra-item">
                                     <span className="extra-label">Box Office:</span>
-                                    <span className="extra-value">${movie.gross}</span>
+                                    <span className="extra-value">{formatMoney(movie.gross)}</span>
                                 </div>
                             )}
                         </div>
