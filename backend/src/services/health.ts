@@ -30,6 +30,7 @@ export const EXPECTED_COLUMNS = [
   "plot_embedding",
   "trailer_key",
   "trailer_checked",
+  "runtime_checked",
   "watch_providers",
   "providers_checked",
 ] as const;
@@ -43,12 +44,22 @@ export const EXPECTED_COLUMNS = [
  */
 export const MIN_TRAILER_CHECKED_PCT = 90;
 
+/**
+ * Share of the catalogue that must have been *checked* for a runtime.
+ *
+ * A runtime gap is invisible in the UI — cards simply omit the length and an
+ * "under N minutes" filter quietly matches almost nothing — so it is reported
+ * explicitly. Like trailers, a film TMDB has no runtime for is still checked.
+ */
+export const MIN_RUNTIME_CHECKED_PCT = 90;
+
 export interface CatalogStats {
   total: number;
   withEmbeddings: number;
   withLanguage: number;
   trailerChecked: number;
   withTrailer: number;
+  runtimeChecked: number;
   /** Column names actually present, from information_schema. */
   columns: string[];
 }
@@ -62,7 +73,10 @@ export interface Coverage {
 export interface CatalogAssessment {
   ok: boolean;
   warnings: string[];
-  coverage: Record<"embeddings" | "language" | "trailer_checked" | "trailers", Coverage>;
+  coverage: Record<
+    "embeddings" | "language" | "trailer_checked" | "trailers" | "runtime_checked",
+    Coverage
+  >;
 }
 
 function pct(have: number, total: number): number {
@@ -78,6 +92,7 @@ export function assessCatalog(stats: CatalogStats): CatalogAssessment {
     language: { have: stats.withLanguage, total, pct: pct(stats.withLanguage, total) },
     trailer_checked: { have: stats.trailerChecked, total, pct: pct(stats.trailerChecked, total) },
     trailers: { have: stats.withTrailer, total, pct: pct(stats.withTrailer, total) },
+    runtime_checked: { have: stats.runtimeChecked, total, pct: pct(stats.runtimeChecked, total) },
   };
 
   if (total === 0) {
@@ -109,6 +124,12 @@ export function assessCatalog(stats: CatalogStats): CatalogAssessment {
   if (coverage.trailer_checked.pct < MIN_TRAILER_CHECKED_PCT) {
     warnings.push(
       `only ${coverage.trailer_checked.pct}% of films have been checked for a trailer (expected >= ${MIN_TRAILER_CHECKED_PCT}%) — run the trailer load`,
+    );
+  }
+
+  if (coverage.runtime_checked.pct < MIN_RUNTIME_CHECKED_PCT) {
+    warnings.push(
+      `only ${coverage.runtime_checked.pct}% of films have been checked for a runtime (expected >= ${MIN_RUNTIME_CHECKED_PCT}%) — run tools/load-backend/backfill.py`,
     );
   }
 

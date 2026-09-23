@@ -43,6 +43,12 @@ async function main(): Promise<void> {
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS watch_providers JSONB");
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS providers_checked BOOLEAN NOT NULL DEFAULT false");
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS providers_updated_at TIMESTAMPTZ");
+    // "We asked TMDB" for a runtime, kept separate from the value itself. The
+    // first attempt at this backfill wrote runtime = 0 for films TMDB had no
+    // runtime for, which is indistinguishable from a real 0-minute film and made
+    // those rows match an `under N minutes` filter. Same contract as
+    // trailer_checked / providers_checked: failure is not recorded as data.
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS runtime_checked BOOLEAN NOT NULL DEFAULT false");
     // Plain unique index (NULLs allowed — they are distinct), so
     // ON CONFLICT (tmdb_id) resolves. Replaces any older partial index.
     await pool.query("DROP INDEX IF EXISTS idx_movies_tmdb_id");

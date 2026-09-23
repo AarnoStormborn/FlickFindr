@@ -39,7 +39,8 @@ async function main(): Promise<void> {
                count(plot_embedding)::int AS with_embeddings,
                count(original_language)::int AS with_language,
                count(*) FILTER (WHERE trailer_checked)::int AS trailer_checked,
-               count(trailer_key)::int AS with_trailer
+               count(trailer_key)::int AS with_trailer,
+               count(*) FILTER (WHERE runtime_checked)::int AS runtime_checked
           FROM movies`);
       const { rows: colRows } = await pool.query(
         "SELECT column_name FROM information_schema.columns WHERE table_name = 'movies'",
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
         withLanguage: Number(c.with_language ?? 0),
         trailerChecked: Number(c.trailer_checked ?? 0),
         withTrailer: Number(c.with_trailer ?? 0),
+        runtimeChecked: Number(c.runtime_checked ?? 0),
         columns: colRows.map((r) => String(r.column_name)),
       };
       const assessment = assessCatalog(stats);

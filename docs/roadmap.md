@@ -99,14 +99,25 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   languages are small (Swedish is 143 films), so scoped rows would return empty,
   and an empty shelf is worse than none.
 
-### Runtime & revenue backfill — **blocked work, data gap**
-- `runtime` is populated for **510 of 30,749 films (1.7%)** and `metascore` for
-  **none**, both verified in production. Consequences: the existing "Sort by
-  Runtime" control ranks almost nothing, the runtime badge on cards is absent,
-  and `Short & Sweet` cannot be built.
-- Recoverable: `tools/load-backend/backfill.py` fills runtime + gross from TMDB
-  one film at a time (~30k calls, resumable, `--concurrency`). Same shape as the
-  trailer/provider work, so it belongs on the Pi ingest schedule.
+### Runtime & revenue backfill — **in progress, data gap**
+- **Production had zero runtimes**: 0 of 30,749. The 510 / 1.7% figure that first
+  looked like "mostly fine" was the *local* database — the tool read DB_* from
+  `backend/.env`, found none, and silently defaulted to localhost, so an earlier
+  run filled the dev database and production was never touched. The script now
+  prefers `DATABASE_URL`, and the coverage gap is reported by the drift detector.
+- Consequences in production: "Sort by Runtime" sorted an empty column, card
+  runtime badges never appeared, and any "under N minutes" filter matched nothing.
+  `Short & Sweet` could not be built, which is how this was found.
+- Fix: a `runtime_checked` flag (same contract as `trailer_checked` /
+  `providers_checked` — "we asked" is recorded separately from the value, so a
+  film TMDB has no runtime for stays NULL rather than being recorded as 0 minutes)
+  plus `tools/load-backend/backfill.py --concurrency N` against `DATABASE_URL`.
+  ~30k per-film requests (runtime is not in `/discover`), resumable.
+- **Host matters.** TMDB is unreachable from the dev Mac: ~20% of requests fail
+  with *a successful TLS handshake followed by a reset*. A 1472-byte probe is
+  dropped while 1400 passes — an MTU black hole behind a tunnel, not a bad key.
+  The Pi's connectivity is proven (it has fetched 25k trailers) and is the better
+  host; the Mac manages ~1 film/s, so the full pass is an overnight job there.
 - **Not recoverable: `metascore`.** TMDB carries no Metacritic score, so the
   badge and its sort control were dead UI and have been removed rather than left
   to look broken. Sourcing it would mean a different provider.
