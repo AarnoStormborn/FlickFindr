@@ -155,6 +155,12 @@ npm run backfill:providers -- --all         # whole catalogue
   per-film work (trailers, `--fill`) really is one request per film.
 - **Search pagination is capped at the first 100 results** (`MAX_RESULTS` in
   `src/models.ts`); a `skip` beyond that is a 400 by design.
+- **Box office (`gross`) is absent for most obscure films, and that is the data,
+  not a bug.** Coverage is 43.7% overall, but **89.9%** of films with 1,000+ votes
+  and **99.5%** of those with 10,000+. TMDB has no revenue for the long tail, so
+  the detail page simply omits the row rather than showing "$0". Stored as exact
+  dollars in a text column; the UI shortens it (`$40.1M`, `$2.9B`) via
+  `frontend/src/lib/format.js`.
 - **Runtime is now covered, and the gap is worth remembering.** Production had
   **0 of 30,749** runtimes: "Sort by Runtime" was sorting an empty column, card
   runtime badges never appeared, and an "under N minutes" filter matched nothing —
