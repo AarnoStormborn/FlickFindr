@@ -22,6 +22,17 @@ const CURRENT_YEAR = new Date().getFullYear();
 /** A rating from a few hundred votes is still a small sample, hence the floors. */
 export const MOODS = [
     {
+        id: 'short-and-sweet',
+        displayName: 'Short & Sweet',
+        caption: 'Great films that respect your evening',
+        // Was blocked until `runtime` was backfilled: the column held data for 12
+        // films, so this row could not exist. It now covers 1,628 films with
+        // 1,000+ votes, narrowed by a rating floor so "Sweet" means something.
+        // Verified top: Grave of the Fireflies, The Lion King, WALL-E, Reservoir
+        // Dogs, The Grand Budapest Hotel, Toy Story.
+        filters: { maxRuntime: 100, minVotes: 1000, minRating: 7.0 },
+    },
+    {
         id: 'mind-bending',
         displayName: 'Mind-Bending',
         caption: 'Twisty mysteries that rewire your brain',

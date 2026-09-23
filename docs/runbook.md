@@ -155,23 +155,28 @@ npm run backfill:providers -- --all         # whole catalogue
   per-film work (trailers, `--fill`) really is one request per film.
 - **Search pagination is capped at the first 100 results** (`MAX_RESULTS` in
   `src/models.ts`); a `skip` beyond that is a 400 by design.
-- **Production had no runtimes and no metascore** (0 of 30,749 had a runtime), so
-  "Sort by Runtime" sorted an empty column and card runtime badges never appeared.
-  The 510 / 1.7% figure seen locally was the *dev* database: the backfill tool read
-  DB_* from `backend/.env`, found none, and defaulted to localhost, so an earlier
-  run filled dev while production was never touched. It now prefers
-  `DATABASE_URL` — always pass it explicitly when targeting production.
-  Metascore is **not** recoverable (TMDB has no Metacritic data), so its badge and
-  sort control were removed rather than left looking broken.
-- **Run the runtime backfill from a host that can actually reach TMDB.**
+- **Runtime is now covered, and the gap is worth remembering.** Production had
+  **0 of 30,749** runtimes: "Sort by Runtime" was sorting an empty column, card
+  runtime badges never appeared, and an "under N minutes" filter matched nothing —
+  with no warning anywhere, because cards simply omit a missing length. Now 30,700
+  have a runtime and 30,748 are checked (TMDB has none for the last 47; they keep
+  NULL and are marked checked, never 0, which would match an `under N minutes`
+  filter). `npm run check --strict` reports no warnings against production.
+  The 510 / 1.7% confusion earlier was the *dev* database: the tool read DB_* from
+  `backend/.env`, found none, and defaulted to localhost. It now prefers
+  `DATABASE_URL` — always pass it explicitly for production. Metascore is **not**
+  recoverable (TMDB has no Metacritic data), so its badge and sort control were
+  removed rather than left looking broken.
+- **Re-running the runtime backfill** (new films, or a partial run):
   `cd tools/load-backend && DATABASE_URL=... .venv/bin/python backfill.py
-  --concurrency 8`. From the dev Mac ~20% of requests fail and it runs at ~1
-  film/s, so the full catalogue is an overnight job; the Pi's connectivity is
-  proven and is the better host. The failure signature is a *successful TLS
-  handshake* followed by `Connection reset by peer` (`curl` code 000) — with a
-  1472-byte ping dropped and 1400 passing, that is an MTU black hole behind a
-  tunnel, not a bad key. The script aborts after 25 consecutive failures instead
-  of grinding, and `runtime_checked` makes it resumable.
+  --concurrency 8`. It is resumable via `runtime_checked`, prints its target host,
+  and aborts after 25 consecutive failures rather than grinding. Keep-alive
+  session reuse is what makes it fast (13 films/s vs 1.1); a fresh handshake per
+  request is what makes a lossy path look like a rate limit. If it ever reports
+  nothing but failures, the signature is a *successful TLS handshake* followed by
+  `Connection reset by peer` (`curl` code 000) with a 1472-byte ping dropped and
+  1400 passing — an MTU black hole behind a tunnel, not a bad key. Run it from the
+  Pi instead.
 - **Mood rows are filters, not vibes.** Semantic mood queries do not work yet:
   the embedding model has no popularity prior, so plot-similar but obscure films
   outrank well-known ones ("a young wizard at a magic school" put two films with

@@ -57,7 +57,8 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 | **More Like This** | `/flicks/movie/:id/similar`, detail page | Genre-aware embedding neighbours, in a carousel with arrows |
 | **Discovery shelves** | `frontend/src/data/shelves.js` | Latest / Going Retro / Millennium + curated genre rows, with vote floors |
 | **Cinematic redesign** | `frontend/src/index.css` (tokens) · `docs/FRONTEND_DESIGN_INSPIRATION.md` (rationale) | Dark editorial palette, Bodoni Moda / Inter, floating nav. The CSS custom properties are the source of truth — the design doc predates the build and its sample hexes differ |
-| **Mood shelves** | `frontend/src/data/moods.js`, `frontend/src/pages/MoodPage.jsx` | Mind-Bending / Late-Night Thrills / Hidden Gems rows on the home page, each with a See-more page sharing the same filters. Tuned against the catalogue — see the roadmap for the two definitions that were changed and why |
+| **Mood shelves** | `frontend/src/data/moods.js`, `frontend/src/pages/MoodPage.jsx` | Short & Sweet / Mind-Bending / Late-Night Thrills / Hidden Gems rows on the home page, each with a See-more page sharing the same filters. Tuned against the catalogue — see the roadmap for the definitions that were changed and why |
+| **Runtime coverage** | `tools/load-backend/backfill.py`, `backend/src/services/health.ts` | 30,700 of 30,749 films now have a runtime (was **0**); TMDB has none for the remaining 47, which are marked checked rather than written as 0. Unblocked the Runtime sort, card runtime badges and Short & Sweet. The drift detector now reports runtime coverage |
 | **Home language browse** | `frontend/src/pages/MoviesPage.jsx` | A language selector that swaps the shelves for a ranked "Top in <language>" browse, carried in the URL. A mode switch rather than filtering each row, since most of the 88 languages are too small to fill a shelf |
 | **Shared browse grid** | `frontend/src/components/BrowseGrid.jsx` | Genre, era and mood pages were three copies of the same fetch/sort/paginate body; now one component. Also the single place that drops the unusable Metascore sort |
 | **Vote-weighted ranking** | `backend/src/services/rating.ts` | Ranking by raw `rating` put films with ~100 votes at the top of every browse list, ahead of films with tens of thousands. Sorting by rating now uses a Bayesian score — `(v/(v+m))·rating + (m/(v+m))·mean`, m = 1000 — applied everywhere rating is the sort key (browse, filter, search, agent, and the provider backfill). Nothing is hidden: a low-vote film is still returned, just placed by evidence rather than by a small sample |
@@ -72,18 +73,19 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 
 ## Next up
 
-### Mood & occasion collections — *shipped (3 of 4)*
-- Mood rows on the home page, each cutting across genres: **Mind-Bending**
-  (twisty mysteries), **Late-Night Thrills** (horror), **Hidden Gems** (well
-  rated, under 5,000 votes). Each has a "See more" page driven by the same
-  filters, so the row and the page cannot disagree.
+### Mood & occasion collections — *shipped*
+- Mood rows on the home page, each cutting across genres: **Short & Sweet**
+  (under 100 minutes and well rated), **Mind-Bending** (twisty mysteries),
+  **Late-Night Thrills** (horror), **Hidden Gems** (well rated, under 5,000
+  votes). Each has a "See more" page driven by the same filters, so a row and
+  its page cannot disagree.
 - Every definition was tuned against the catalogue and the films read back
-  before shipping. Two corrections came out of that: a Thriller filter returned
-  the same films as the top-rated row (so Late-Night Thrills uses Horror), and
-  Hidden Gems needed a vote *ceiling* plus a recency cap — without them it was
-  the top-rated list again, or a list of 2026 releases with unsettled ratings.
-- **`Short & Sweet` (under 100 min) is not shippable yet** — see the runtime
-  note below.
+  before shipping. Three corrections came out of that: a Thriller filter returned
+  the same films as the top-rated row (so Late-Night Thrills uses Horror), Hidden
+  Gems needed a vote *ceiling* plus a recency cap (without them it was either the
+  top-rated list again or a list of 2026 releases with unsettled ratings), and
+  Short & Sweet had to wait for the runtime backfill below — it would have drawn
+  on 12 films.
 - **The semantic path does not work for moods yet.** `Mind-Bending` was meant to
   be a semantic query ("a film that bends reality") and was tried first: the
   embedding model has no popularity prior, so "a young wizard at a magic school"
@@ -99,28 +101,28 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   languages are small (Swedish is 143 films), so scoped rows would return empty,
   and an empty shelf is worse than none.
 
-### Runtime & revenue backfill — **in progress, data gap**
-- **Production had zero runtimes**: 0 of 30,749. The 510 / 1.7% figure that first
-  looked like "mostly fine" was the *local* database — the tool read DB_* from
-  `backend/.env`, found none, and silently defaulted to localhost, so an earlier
-  run filled the dev database and production was never touched. The script now
-  prefers `DATABASE_URL`, and the coverage gap is reported by the drift detector.
-- Consequences in production: "Sort by Runtime" sorted an empty column, card
-  runtime badges never appeared, and any "under N minutes" filter matched nothing.
-  `Short & Sweet` could not be built, which is how this was found.
-- Fix: a `runtime_checked` flag (same contract as `trailer_checked` /
-  `providers_checked` — "we asked" is recorded separately from the value, so a
-  film TMDB has no runtime for stays NULL rather than being recorded as 0 minutes)
-  plus `tools/load-backend/backfill.py --concurrency N` against `DATABASE_URL`.
-  ~30k per-film requests (runtime is not in `/discover`), resumable.
-- **Host matters.** TMDB is unreachable from the dev Mac: ~20% of requests fail
-  with *a successful TLS handshake followed by a reset*. A 1472-byte probe is
-  dropped while 1400 passes — an MTU black hole behind a tunnel, not a bad key.
-  The Pi's connectivity is proven (it has fetched 25k trailers) and is the better
-  host; the Mac manages ~1 film/s, so the full pass is an overnight job there.
+### Runtime backfill — *done*
+- **Production had zero runtimes** when this started: 0 of 30,749. The 510 / 1.7%
+  figure that first looked like "mostly fine" was the *local* database — the tool
+  read DB_* from `backend/.env`, found none, and silently defaulted to localhost,
+  so an earlier run filled the dev database and production was never touched.
+- **Now 30,700 films have a runtime and 30,748 have been checked** (the rest are
+  films TMDB has no runtime for, recorded as checked with runtime NULL rather than
+  a 0 that would match an "under N minutes" filter). `npm run check --strict`
+  reports no warnings against production.
+- Fixed the things this was blocking: "Sort by Runtime" sorts real data, card
+  runtime badges appear (production had never shown one), and **Short & Sweet**
+  could be built — its pool went from 12 films to 1,628.
+- Throughput was 1.1 films/s until the client was made to reuse TLS connections;
+  13.3 films/s afterwards, for the whole catalogue in 37 minutes.
+- **Host matters.** TMDB is only partly reachable from the dev Mac: ~50% of
+  requests fail with *a successful TLS handshake followed by a reset*. A 1472-byte
+  probe is dropped while 1400 passes — an MTU black hole behind a tunnel, not a
+  bad key. Keep-alive mostly neutralises it, but the Pi's connectivity is proven
+  and is the better host for scheduled work.
 - **Not recoverable: `metascore`.** TMDB carries no Metacritic score, so the
-  badge and its sort control were dead UI and have been removed rather than left
-  to look broken. Sourcing it would mean a different provider.
+  badge and its sort control were removed rather than left to look broken.
+  Sourcing it would mean a different provider.
 
 ### Surprise me
 - One button → a random highly-rated film; optional constraint (genre, under 2h).
