@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -75,31 +76,51 @@ def _db_url() -> str:
     return f"postgresql://{user}:{pw}@{host}:{port}/{name}"
 
 
-def _fetch_detail(api_key: str, base: str, tmdb_id: int) -> dict | None:
+_thread_local = threading.local()
+
+
+def _session():
+    """One keep-alive session per worker thread.
+
+    Reuse matters more than usual here: when the failures are connection resets
+    they happen *during* the TLS handshake (the server's certificate packets are
+    large enough to be dropped by a broken path MTU), so a connection that
+    completed its handshake can serve many requests before another one is needed.
+    """
     import requests
 
+    session = getattr(_thread_local, "session", None)
+    if session is None:
+        session = requests.Session()
+        session.mount("https://", requests.adapters.HTTPAdapter(pool_connections=2, pool_maxsize=4, max_retries=0))
+        _thread_local.session = session
+    return session
+
+
+def _fetch_detail(api_key: str, base: str, tmdb_id: int) -> dict | None:
     url = f"{base}/movie/{tmdb_id}"
     params = {"api_key": api_key, "language": "en-US"}
     attempt = 0
-    # Short ladder on purpose. A long one does not fix an unreachable host, it
-    # just hides the problem: 8 attempts with a 60s cap is ~5 minutes spent per
-    # film, which reads as "slow" rather than "broken".
     while True:
         try:
-            resp = requests.get(url, params=params, timeout=(5, 15))
-        except requests.RequestException:
+            resp = _session().get(url, params=params, timeout=(5, 15))
+        except Exception:
+            # Connection reset / timeout. These are not rate limiting, and with a
+            # lossy path a fresh attempt often succeeds immediately, so retrying
+            # fast beats the old 2-4-8s ladder that halved throughput.
             attempt += 1
             if attempt >= MAX_ATTEMPTS:
                 return None
-            time.sleep(2 ** attempt)
+            time.sleep(0.3 * attempt)
             continue
         if resp.ok:
             return resp.json()
-        if resp.status_code in (429, 500, 502, 503, 504):
+        if resp.status_code == 429 or resp.status_code >= 500:
+            # This *is* throttling (or TMDB trouble): back off properly.
             attempt += 1
-            if attempt >= MAX_ATTEMPTS:
+            if attempt >= MAX_THROTTLE_ATTEMPTS:
                 return None
-            time.sleep(2 ** attempt)
+            time.sleep(min(5 * 2 ** (attempt - 1), 30))
             continue
         return None  # 404 or other — movie gone; leave unchecked
 
@@ -107,7 +128,11 @@ def _fetch_detail(api_key: str, base: str, tmdb_id: int) -> dict | None:
 # Consecutive failures before giving up. One dead film is normal (a 404); a run
 # of them means this host cannot reach TMDB, and continuing would waste hours.
 CONSECUTIVE_FAILURE_LIMIT = 25
-MAX_ATTEMPTS = 4
+MAX_ATTEMPTS = 5
+MAX_THROTTLE_ATTEMPTS = 4
+# Every N films. Low on purpose: progress that only prints every 250 successes
+# makes a slow run look like a hung one, which is exactly how it was misread.
+PROGRESS_EVERY = 50
 
 
 def main() -> None:
@@ -200,12 +225,12 @@ def main() -> None:
                         total_filled += 1
                     else:
                         no_data += 1
-                    if total_done % 250 == 0:
+                    if total_done % PROGRESS_EVERY == 0:
                         conn.commit()
                         rate = total_done / max(time.monotonic() - started, 0.001)
                         print(
-                            f"  {total_done}/{len(ids)} done ({total_filled} filled, "
-                            f"{no_data} no-data) — {rate:.1f} films/s",
+                            f"  {total_done}/{len(ids)} checked ({total_filled} filled, "
+                            f"{no_data} no-data, {failed} unreachable) — {rate:.1f} films/s",
                             flush=True,
                         )
                 conn.commit()
