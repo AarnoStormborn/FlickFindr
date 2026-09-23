@@ -4,6 +4,7 @@ import MoviesPage from './pages/MoviesPage';
 import MovieDetailsPage from './pages/MovieDetailsPage';
 import GenrePage from './pages/GenrePage';
 import EraPage from './pages/EraPage';
+import MoodPage from './pages/MoodPage';
 import SearchPage from './pages/SearchPage';
 import ListsPage from './pages/ListsPage';
 import ChatPage from './pages/ChatPage';
@@ -22,6 +23,7 @@ function App() {
             <Route path="/movie/:id" element={<MovieDetailsPage />} />
             <Route path="/genre/:name" element={<GenrePage />} />
             <Route path="/era/:id" element={<EraPage />} />
+            <Route path="/mood/:id" element={<MoodPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/lists" element={<ListsPage />} />

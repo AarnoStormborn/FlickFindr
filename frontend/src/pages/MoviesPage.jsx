@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import CategoryRow from '../components/CategoryRow';
 import ViewToggle from '../components/ViewToggle';
 import MovieListTable from '../components/MovieListTable';
-import { getMoviesByGenre, searchMovies } from '../api/movies';
+import BrowseGrid from '../components/BrowseGrid';
+import { getMoviesByGenre, searchMovies, getLanguages } from '../api/movies';
 import { YEAR_SHELVES, GENRE_ROWS, BEST_OF_MIN_VOTES, LATEST_MIN_VOTES } from '../data/shelves';
+import { MOODS } from '../data/moods';
+import { languageName, languageOptionLabel } from '../lib/languages';
 import useViewMode from '../hooks/useViewMode';
 import { mergeTop } from '../lib/mergeTop';
 import './MoviesPage.css';
+// BrowseGrid's markup is styled by the shared browse-page sheet.
+import './GenrePage.css';
 import LoadingQuips from '../components/LoadingQuips';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -26,7 +31,13 @@ const HOME_SHELVES = YEAR_SHELVES.map((s) => ({
     },
 }));
 
-const ALL_ROWS = [...HOME_SHELVES, ...GENRE_ROWS];
+/** Mood rows: the same filters as their "See more" page, trimmed to 15. */
+const MOOD_ROWS = MOODS.map((m) => ({
+    ...m,
+    load: () => searchMovies({ ...m.filters, limit: 15, sortBy: 'rating', sortOrder: 'desc' }),
+}));
+
+const ALL_ROWS = [...HOME_SHELVES, ...GENRE_ROWS, ...MOOD_ROWS];
 
 export default function MoviesPage() {
     const navigate = useNavigate();
@@ -36,6 +47,25 @@ export default function MoviesPage() {
     const [view, setView] = useViewMode();
     const [topMovies, setTopMovies] = useState([]);
     const [topLoading, setTopLoading] = useState(false);
+
+    // The home language choice lives in the URL so it is shareable and survives
+    // a reload, matching how the search page carries its language filter.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const language = searchParams.get('lang') || '';
+    const [languages, setLanguages] = useState([]);
+
+    useEffect(() => {
+        getLanguages()
+            .then((list) => setLanguages(Array.isArray(list) ? list : []))
+            .catch((err) => console.error('Failed to load languages:', err));
+    }, []);
+
+    const setLanguage = (code) => {
+        const next = new URLSearchParams(searchParams);
+        if (code) next.set('lang', code);
+        else next.delete('lang');
+        setSearchParams(next, { replace: true });
+    };
 
     // Fetch each shelf/row on mount.
     useEffect(() => {
@@ -79,8 +109,9 @@ export default function MoviesPage() {
         fetchAll();
     }, []);
 
-    const handleSeeMore = (row, isGenre) => {
-        if (isGenre) navigate(`/genre/${row.seeMoreGenre}`);
+    const handleSeeMore = (row, kind) => {
+        if (kind === 'genre') navigate(`/genre/${row.seeMoreGenre}`);
+        else if (kind === 'mood') navigate(`/mood/${row.id}`);
         else navigate(`/era/${row.id}`);
     };
 
@@ -108,14 +139,14 @@ export default function MoviesPage() {
         );
     }
 
-    const renderShelf = (row, isGenre) => (
+    const renderShelf = (row, kind) => (
         <CategoryRow
             key={row.id}
             title={row.displayName}
             caption={row.caption}
             movies={rowData[row.id] || []}
             isLoading={loading[row.id]}
-            onSeeMore={() => handleSeeMore(row, isGenre)}
+            onSeeMore={() => handleSeeMore(row, kind)}
         />
     );
 
@@ -138,12 +169,52 @@ export default function MoviesPage() {
                 <div className="hero-gradient"></div>
             </section>
 
-            {/* Shelves */}
-            {view === 'grid' ? (
+            {/* Language: choosing one swaps the shelves for a browse of that
+                language rather than filtering every row, because most of the 88
+                languages are small enough that scoped rows would come back
+                empty (Swedish is 143 films, not 15-per-row across 11 rows). */}
+            <div className="movies-lang-bar">
+                <label className="lang-label" htmlFor="home-language">
+                    Language
+                </label>
+                <select
+                    id="home-language"
+                    className="lang-select"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                >
+                    <option value="">All languages</option>
+                    {languages.map((entry) => (
+                        <option key={entry.code} value={entry.code}>
+                            {languageOptionLabel(entry)}
+                        </option>
+                    ))}
+                </select>
+                {language && (
+                    <button className="lang-clear" onClick={() => setLanguage('')}>
+                        Clear
+                    </button>
+                )}
+            </div>
+
+            {language ? (
+                <BrowseGrid
+                    filters={{ language }}
+                    title={`Top in ${languageName(language)}`}
+                    subtitle="Ranked by vote-weighted rating"
+                    sortOptions={[
+                        { value: 'rating', label: 'Rating' },
+                        { value: 'movie_name', label: 'Name' },
+                    ]}
+                    emptyText={`No films recorded in ${languageName(language)}.`}
+                />
+            ) : view === 'grid' ? (
                 <div className="movies-categories">
-                    {HOME_SHELVES.map((row) => renderShelf(row, false))}
+                    {HOME_SHELVES.map((row) => renderShelf(row, 'era'))}
                     <div className="genre-row-divider" />
-                    {GENRE_ROWS.map((row) => renderShelf(row, true))}
+                    {GENRE_ROWS.map((row) => renderShelf(row, 'genre'))}
+                    <div className="genre-row-divider" />
+                    {MOOD_ROWS.map((row) => renderShelf(row, 'mood'))}
                 </div>
             ) : (
                 <div className="movies-categories">

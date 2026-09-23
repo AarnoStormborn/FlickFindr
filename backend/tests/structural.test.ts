@@ -38,11 +38,18 @@ describe("buildStructuralQuery", () => {
     }
   });
 
-  it("appends filters with positional params", () => {
-    const q = buildStructuralQuery({ query: "dark", genre: "Crime", min_rating: 7, sort_by: "movie_name", sort_order: "asc", skip: 0, limit: 10 });
+  it("appends filters with positional params", () => {    const q = buildStructuralQuery({ query: "dark", genre: "Crime", min_rating: 7, sort_by: "movie_name", sort_order: "asc", skip: 0, limit: 10 });
     expect(q.whereSql).toBe("WHERE movie_name ILIKE $1 AND genre ILIKE $2 AND rating >= $3");
     expect(q.params).toEqual(["%dark%", "%Crime%", 7, 10, 0]);
     expect(q.sql).toContain("ORDER BY movie_name ASC NULLS LAST");
+  });
+
+  it("bounds votes on both sides", () => {
+    // The ceiling is what makes a "Hidden Gems" style query possible: a floor
+    // alone still returns the most-voted films, just in a different order.
+    const q = buildStructuralQuery({ min_votes: 500, max_votes: 5000, sort_by: "rating", sort_order: "desc", skip: 0, limit: 10 });
+    expect(q.whereSql).toBe("WHERE NULLIF(votes, '')::int >= $1 AND NULLIF(votes, '')::int <= $2");
+    expect(q.params).toEqual([500, 5000, 10, 0]);
   });
 });
 

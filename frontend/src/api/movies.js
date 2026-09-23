@@ -143,6 +143,7 @@ export async function searchMovies(params = {}) {
     if (params.minYear != null) body.min_year = params.minYear;
     if (params.maxYear != null) body.max_year = params.maxYear;
     if (params.minVotes != null) body.min_votes = params.minVotes;
+    if (params.maxVotes != null) body.max_votes = params.maxVotes;
     body.sort_by = params.sortBy || 'rating';
     body.sort_order = params.sortOrder || 'desc';
     body.skip = params.skip || 0;

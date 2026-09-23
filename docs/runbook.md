@@ -155,6 +155,19 @@ npm run backfill:providers -- --all         # whole catalogue
   per-film work (trailers, `--fill`) really is one request per film.
 - **Search pagination is capped at the first 100 results** (`MAX_RESULTS` in
   `src/models.ts`); a `skip` beyond that is a 400 by design.
+- **`runtime` is 1.7% populated and `metascore` is 0%** — verified in
+  production (510 of 30,749 have runtime; no film has a metascore). Features that
+  read those columns are therefore near-dead: "Sort by Runtime" ranks almost
+  nothing, the runtime badge on cards never appears, and any "under N minutes"
+  filter matches a handful of films. Runtime is recoverable from TMDB with
+  `tools/load-backend/backfill.py` (~30k per-film calls, resumable). Metascore is
+  **not** — TMDB has no Metacritic data — so its badge and sort control were
+  removed rather than left looking broken.
+- **Mood rows are filters, not vibes.** Semantic mood queries do not work yet:
+  the embedding model has no popularity prior, so plot-similar but obscure films
+  outrank well-known ones ("a young wizard at a magic school" put two films with
+  61 and 861 votes above Harry Potter). Define moods in `frontend/src/data/moods.js`
+  with filters until Search relevance lands.
 - **Ranked queries must break ties by `id`.** Without a tiebreaker, `OFFSET`
   paging on a tied sort repeats some rows and silently skips others.
 - **Sorting by rating means the vote-weighted score, not the raw column**
