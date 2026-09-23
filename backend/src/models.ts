@@ -104,6 +104,11 @@ export interface MovieRow {
 
 export interface MovieResult extends Omit<MovieRow, "plot_embedding"> {
   similarity_score?: number | null;
+  /**
+   * Vote-weighted rating, the key results are ranked by when sorting by rating.
+   * Sent so clients can preserve that ranking when merging result sets.
+   */
+  weighted_rating?: number | null;
 }
 
 export interface SearchResponse {

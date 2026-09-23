@@ -7,7 +7,9 @@
  * why this is per-film work while the language backfill was not.
  *
  * Starts with the highest-rated films, which is the order the app itself
- * browses, so a partial backfill covers what visitors actually open first.
+ * browses, so a partial backfill covers what visitors actually open first. The
+ * ordering uses the same vote-weighted rating the app ranks by, so the sample
+ * lands on films people recognise rather than on high-rated obscurities.
  *
  * No checkpoint file: the row IS the checkpoint. `providers_checked` marks a
  * film TMDB has answered for, so the job is resumable, re-runnable and safe to
@@ -23,6 +25,7 @@
 import { getPool, closePool } from "../src/db/pool.js";
 import { logger } from "../src/logger.js";
 import { configuredRegions, getWatchProviders } from "../src/tmdb.js";
+import { WEIGHTED_RATING_SQL } from "../src/services/rating.js";
 
 const args = process.argv.slice(2);
 const ALL = args.includes("--all");
@@ -70,9 +73,11 @@ async function main(): Promise<void> {
       // Highest-rated first: the app browses by rating, so this is the order in
       // which films are actually opened. `id` breaks ties so batches cannot
       // repeat or skip rows.
+      // Vote-weighted, matching how the app itself ranks: the raw rating would
+      // spend the first batches on 9.9-rated films with three-figure vote counts.
       `SELECT id, tmdb_id FROM movies
         WHERE providers_checked = false AND tmdb_id IS NOT NULL
-        ORDER BY rating DESC NULLS LAST, id ASC
+        ORDER BY ${WEIGHTED_RATING_SQL} DESC NULLS LAST, id ASC
         LIMIT $1`,
       [remaining],
     );

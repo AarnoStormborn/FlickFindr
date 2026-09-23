@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logger } from "../logger.js";
 import type { MovieResult, Queryable } from "../models.js";
 import { MOVIE_COLUMNS, toMovieResult } from "../services/structural.js";
+import { WEIGHTED_RATING_SQL } from "../services/rating.js";
 import { semanticService } from "../services/semantic.js";
 import { getMovieVideos, getWatchProviders } from "../tmdb.js";
 
@@ -54,7 +55,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
     const { skip, limit } = parsed.data;
     try {
       const { rows } = await db.query(
-        `SELECT ${MOVIE_COLUMNS} FROM movies ORDER BY rating DESC NULLS LAST, id ASC LIMIT $1 OFFSET $2`,
+        `SELECT ${MOVIE_COLUMNS} FROM movies ORDER BY ${WEIGHTED_RATING_SQL} DESC NULLS LAST, id ASC LIMIT $1 OFFSET $2`,
         [limit, skip],
       );
       if (rows.length === 0) return reply.code(404).send({ detail: "Movies not found" });
@@ -237,7 +238,7 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       const { rows } = await db.query(
         `SELECT ${MOVIE_COLUMNS} FROM movies ${
           where.length ? `WHERE ${where.join(" AND ")}` : ""
-        } ORDER BY rating DESC NULLS LAST, id ASC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        } ORDER BY ${WEIGHTED_RATING_SQL} DESC NULLS LAST, id ASC LIMIT $${params.length - 1} OFFSET $${params.length}`,
         params,
       );
       if (rows.length === 0) {

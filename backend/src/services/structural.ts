@@ -1,4 +1,5 @@
 import { logger } from "../logger.js";
+import { WEIGHTED_RATING_SQL } from "./rating.js";
 import type {
   GenreItem,
   LanguageItem,
@@ -10,7 +11,8 @@ import type {
 } from "../models.js";
 
 export const MOVIE_COLUMNS = `id, movie_name, release_year, original_language, rating, runtime, genre,
-  metascore, plot, directors, stars, votes, gross, poster_url`;
+  metascore, plot, directors, stars, votes, gross, poster_url,
+  ${WEIGHTED_RATING_SQL} AS weighted_rating`;
 
 function toMovieResult(row: Record<string, unknown>): MovieResult {
   return {
@@ -31,6 +33,13 @@ function toMovieResult(row: Record<string, unknown>): MovieResult {
       row.original_language === null || row.original_language === undefined
         ? null
         : String(row.original_language),
+    // The same score the ORDER BY uses, so a client that has to merge two
+    // already-ranked result sets (see frontend mergeTop) can keep the order
+    // instead of re-deciding it from the raw rating and undoing the weighting.
+    weighted_rating:
+      row.weighted_rating === null || row.weighted_rating === undefined
+        ? null
+        : Number(row.weighted_rating),
     similarity_score:
       "similarity_score" in row && row.similarity_score !== null
         ? Number(row.similarity_score)
@@ -109,10 +118,14 @@ export function buildStructuralQuery(req: StructuralSearchRequest): StructuralQu
   const sortColumn = ["movie_name", "rating", "runtime", "metascore", "release_year"].includes(req.sort_by)
     ? req.sort_by
     : "rating";
+  // "rating" means the vote-weighted score, not the raw column: a 66-vote 9.1
+  // must not outrank a 31,000-vote 8.7. The `id` tiebreak stays last so OFFSET
+  // paging remains stable (see tests/language.test.ts).
+  const sortExpression = sortColumn === "rating" ? WEIGHTED_RATING_SQL : sortColumn;
 
   return {
     sql: `SELECT ${MOVIE_COLUMNS} FROM movies ${whereSql}
-      ORDER BY ${sortColumn} ${order} NULLS LAST, id ASC
+      ORDER BY ${sortExpression} ${order} NULLS LAST, id ASC
       LIMIT $${whereParams.length + 1} OFFSET $${whereParams.length + 2}`,
     params: [...whereParams, req.limit, req.skip],
     whereSql,
