@@ -6,6 +6,7 @@ import MovieListTable from '../components/MovieListTable';
 import { getMoviesByGenre, searchMovies } from '../api/movies';
 import { YEAR_SHELVES, GENRE_ROWS, BEST_OF_MIN_VOTES, LATEST_MIN_VOTES } from '../data/shelves';
 import useViewMode from '../hooks/useViewMode';
+import { mergeTop } from '../lib/mergeTop';
 import './MoviesPage.css';
 import LoadingQuips from '../components/LoadingQuips';
 
@@ -26,21 +27,6 @@ const HOME_SHELVES = YEAR_SHELVES.map((s) => ({
 }));
 
 const ALL_ROWS = [...HOME_SHELVES, ...GENRE_ROWS];
-
-/** Merge multiple result sets, dedupe by id, keep top N by rating desc. */
-function mergeTop(perFetch, top = 15) {
-    const seen = new Set();
-    const merged = [];
-    perFetch
-        .flatMap((res) => res.results ?? [])
-        .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
-        .forEach((m) => {
-            if (seen.has(m.id)) return;
-            seen.add(m.id);
-            merged.push(m);
-        });
-    return merged.slice(0, top);
-}
 
 export default function MoviesPage() {
     const navigate = useNavigate();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Queryable } from "../src/models.js";
 import { buildStructuralQuery, structuralService } from "../src/services/structural.js";
+import { WEIGHTED_RATING_SQL } from "../src/services/rating.js";
 
 function fakeDb(rows: Record<string, unknown>[]): Queryable {
   return {
@@ -13,10 +14,28 @@ function fakeDb(rows: Record<string, unknown>[]): Queryable {
 describe("buildStructuralQuery", () => {
   it("builds a plain query with pagination", () => {
     const q = buildStructuralQuery({ query: undefined, sort_by: "rating", sort_order: "desc", skip: 5, limit: 20 });
-    expect(q.sql).toContain("ORDER BY rating DESC NULLS LAST");
+    // "rating" orders by the vote-weighted score, not the raw column.
+    expect(q.sql).toContain(WEIGHTED_RATING_SQL);
+    expect(q.sql).toContain("DESC NULLS LAST, id ASC");
+    expect(q.sql).not.toContain("ORDER BY rating");
     expect(q.sql).toContain("LIMIT $1 OFFSET $2");
     expect(q.whereSql).toBe("");
     expect(q.params).toEqual([20, 5]);
+  });
+
+  it("ranks by the weighted score only when rating is the sort column", () => {
+    const weighted = buildStructuralQuery({ sort_by: "rating", sort_order: "desc", skip: 0, limit: 20 });
+    expect(weighted.sql).toContain(WEIGHTED_RATING_SQL);
+
+    // Every other column must stay a plain column sort — no score arithmetic.
+    // Scoped to the ORDER BY: the SELECT always carries the score as
+    // `weighted_rating` so clients can preserve the ranking when merging.
+    for (const sort_by of ["runtime", "movie_name", "metascore", "release_year"] as const) {
+      const q = buildStructuralQuery({ sort_by, sort_order: "desc", skip: 0, limit: 20 });
+      const orderBy = q.sql.slice(q.sql.indexOf("ORDER BY"));
+      expect(orderBy, sort_by).toContain(`ORDER BY ${sort_by} DESC NULLS LAST, id ASC`);
+      expect(orderBy, sort_by).not.toContain("rating::numeric");
+    }
   });
 
   it("appends filters with positional params", () => {

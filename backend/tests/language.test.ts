@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Queryable } from "../src/models.js";
 import { buildStructuralQuery, structuralService } from "../src/services/structural.js";
+import { WEIGHTED_RATING_SQL } from "../src/services/rating.js";
 import { buildApp } from "../src/app.js";
 import { semanticService } from "../src/services/semantic.js";
 
@@ -205,7 +206,9 @@ describe("pagination is deterministic", () => {
    */
   it("breaks rating ties by id so OFFSET pages cannot overlap", () => {
     const q = buildStructuralQuery({ sort_by: "rating", sort_order: "desc", skip: 20, limit: 20 });
-    expect(q.sql).toContain("ORDER BY rating DESC NULLS LAST, id ASC");
+    // The sort key is a computed expression now, so assert the tiebreaker still
+    // *ends* the ORDER BY — that is what keeps OFFSET paging stable.
+    expect(q.sql).toContain(`${WEIGHTED_RATING_SQL} DESC NULLS LAST, id ASC`);
   });
 
   it("keeps the tiebreaker for other sort columns and directions", () => {

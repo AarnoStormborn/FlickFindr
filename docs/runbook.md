@@ -157,6 +157,12 @@ npm run backfill:providers -- --all         # whole catalogue
   `src/models.ts`); a `skip` beyond that is a 400 by design.
 - **Ranked queries must break ties by `id`.** Without a tiebreaker, `OFFSET`
   paging on a tied sort repeats some rows and silently skips others.
+- **Sorting by rating means the vote-weighted score, not the raw column**
+  (`src/services/rating.ts`, m = 1000). Raw `rating` let ~100-vote films top every
+  browse list. Expect `/flicks`, `/search/structural` and `/flicks/filter` to agree
+  on the order, and results to carry `weighted_rating`. Raising `m` makes the
+  ranking more mainstream, lowering it lets more obscure films rise; the value is
+  kept equal to the frontend's `BEST_OF_MIN_VOTES`.
 - **Do not add a keep-alive pinger for Render.** A 24/7 ping consumes ~744 of
   the 750 free instance-hours and exhausting it suspends every free service until
   the cycle resets; cold starts are covered in the UI instead.
