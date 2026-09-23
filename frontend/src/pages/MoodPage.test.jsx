@@ -59,6 +59,15 @@ describe('MoodPage', () => {
         expect(calls[0].body.genre).toBe('Horror');
     });
 
+    it('sends the runtime ceiling for Short & Sweet', async () => {
+        // This row was impossible until `runtime` was backfilled — it would have
+        // drawn on 12 films. The ceiling is the whole definition of the mood.
+        const calls = stubFetch([film(1, 'Toy Story')], 1);
+        renderMood('short-and-sweet');
+        await waitFor(() => expect(calls.length).toBeGreaterThan(0));
+        expect(calls[0].body).toMatchObject({ max_runtime: 100, min_votes: 1000, min_rating: 7.0 });
+    });
+
     it('reports an unknown mood instead of rendering an empty page', async () => {
         stubFetch([], 0);
         renderMood('not-a-mood');
