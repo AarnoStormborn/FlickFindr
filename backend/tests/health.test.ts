@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { EXPECTED_COLUMNS, MIN_TRAILER_CHECKED_PCT, assessCatalog } from "../src/services/health.js";
+import {
+  EXPECTED_COLUMNS,
+  MIN_RUNTIME_CHECKED_PCT,
+  MIN_TRAILER_CHECKED_PCT,
+  assessCatalog,
+} from "../src/services/health.js";
 
 /**
  * The drift detector. Production state was assembled by hand more than once
@@ -16,11 +21,32 @@ const full = (over: Partial<Parameters<typeof assessCatalog>[0]> = {}) => ({
   withLanguage: 30_749,
   trailerChecked: 30_749,
   withTrailer: 25_096,
+  runtimeChecked: 30_749,
   columns: ALL_COLUMNS,
   ...over,
 });
 
 describe("assessCatalog", () => {
+  it("flags a runtime gap, which is invisible in the UI", () => {
+    // 1.7% coverage is what production actually had, and nothing surfaced it: the
+    // cards simply omitted the length and "under N minutes" matched 12 films.
+    const result = assessCatalog(full({ runtimeChecked: 510 }));
+    expect(result.ok).toBe(false);
+    expect(result.coverage.runtime_checked.pct).toBe(1.7);
+    expect(result.warnings.join(" ")).toMatch(/checked for a runtime/);
+  });
+
+  it("accepts a checked runtime even when the value is missing", () => {
+    // A film TMDB has no runtime for is still checked — same contract as
+    // trailers, where many titles genuinely have none. Coverage tracks "we
+    // asked", so a fully checked catalogue passes regardless of how many films
+    // came back with an actual length.
+    const result = assessCatalog(full());
+    expect(result.coverage.runtime_checked.pct).toBe(100);
+    expect(result.warnings.join(" ")).not.toMatch(/checked for a runtime/);
+  });
+
+
   it("passes a fully built catalogue", () => {
     const result = assessCatalog(full());
     expect(result.ok).toBe(true);
@@ -42,7 +68,7 @@ describe("assessCatalog", () => {
   });
 
   it("flags an empty catalogue as not ok", () => {
-    const result = assessCatalog(full({ total: 0, withEmbeddings: 0, withLanguage: 0, trailerChecked: 0, withTrailer: 0 }));
+    const result = assessCatalog(full({ total: 0, withEmbeddings: 0, withLanguage: 0, trailerChecked: 0, withTrailer: 0, runtimeChecked: 0 }));
     expect(result.ok).toBe(false);
     expect(result.warnings.join(" ")).toMatch(/empty/i);
   });
@@ -80,7 +106,7 @@ describe("assessCatalog", () => {
   });
 
   it("treats a zero-row database as 0% rather than dividing by zero", () => {
-    const result = assessCatalog(full({ total: 0, withEmbeddings: 0, withLanguage: 0, trailerChecked: 0, withTrailer: 0 }));
+    const result = assessCatalog(full({ total: 0, withEmbeddings: 0, withLanguage: 0, trailerChecked: 0, withTrailer: 0, runtimeChecked: 0 }));
     for (const value of Object.values(result.coverage)) {
       expect(value.pct).toBe(0);
       expect(Number.isFinite(value.pct)).toBe(true);
@@ -89,7 +115,7 @@ describe("assessCatalog", () => {
 
   it("reports every problem at once rather than stopping at the first", () => {
     const result = assessCatalog(
-      full({ columns: ["id"], withEmbeddings: 0, withLanguage: 0, trailerChecked: 0, withTrailer: 0 }),
+      full({ columns: ["id"], withEmbeddings: 0, withLanguage: 0, trailerChecked: 0, withTrailer: 0, runtimeChecked: 0 }),
     );
     expect(result.warnings.length).toBeGreaterThanOrEqual(4);
   });

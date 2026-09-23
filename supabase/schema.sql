@@ -12,6 +12,9 @@ create table if not exists movies (
   release_year integer,
   rating float,
   runtime integer,
+  -- "TMDB was asked for a runtime", separate from the value: a film TMDB has no
+  -- runtime for keeps runtime NULL rather than being recorded as 0 minutes.
+  runtime_checked boolean not null default false,
   genre text,
   metascore float,
   plot text,
