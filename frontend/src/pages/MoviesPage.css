@@ -134,6 +134,66 @@
     color: #16130c;
 }
 
+/* Language selector: a quiet control bar between the hero and the rows. When a
+   language is chosen it replaces the shelves with a browse of that language. */
+.movies-lang-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 0 10% var(--space-lg);
+}
+
+.lang-label {
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.lang-select {
+    padding: 7px 12px;
+    min-width: 190px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--line-subtle);
+    border-radius: 999px;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.lang-select:hover {
+    background: var(--bg-hover);
+}
+
+.lang-clear {
+    padding: 6px 14px;
+    background: none;
+    border: 1px solid var(--line-subtle);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.lang-clear:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+/* The language browse reuses the shared browse-page markup, which carries its
+   own page-level gutters. */
+.movies-page > .genre-header,
+.movies-page > .genre-controls,
+.movies-page > .movies-grid,
+.movies-page > .pagination,
+.movies-page > .genre-loading,
+.movies-page > .genre-error {
+    padding-left: 10%;
+    padding-right: 10%;
+}
+
 /* Footer Spacing */
 .movies-footer-space {
     height: var(--space-2xl);
@@ -152,5 +212,25 @@
 
     .movies-categories {
         padding: 0 5%;
+    }
+
+    .movies-lang-bar {
+        padding: 0 5% var(--space-md);
+        flex-wrap: wrap;
+    }
+
+    .lang-select {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .movies-page > .genre-header,
+    .movies-page > .genre-controls,
+    .movies-page > .movies-grid,
+    .movies-page > .pagination,
+    .movies-page > .genre-loading,
+    .movies-page > .genre-error {
+        padding-left: 5%;
+        padding-right: 5%;
     }
 }

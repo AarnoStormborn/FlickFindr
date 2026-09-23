@@ -1,34 +1,30 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import BrowseGrid from '../components/BrowseGrid';
-import { shelfById, eraParams } from '../data/shelves';
+import { moodById, moodParams } from '../data/moods';
 import './GenrePage.css';
 
-export default function EraPage() {
+/**
+ * "See more" for a mood row. The mood's definition lives in data/moods.js, so
+ * the row on the home page and this full result set can never disagree — they
+ * are the same filters.
+ */
+export default function MoodPage() {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    const shelf = shelfById(id);
-    const filters = eraParams(id);
+    const mood = moodById(id);
+    const filters = moodParams(id);
 
-    if (!shelf || !filters) {
+    if (!mood || !filters) {
         return (
             <div className="genre-page">
                 <div className="genre-error">
-                    <p>Unknown era.</p>
+                    <p>Unknown mood.</p>
                     <button onClick={() => navigate('/')}>Back to Home</button>
                 </div>
             </div>
         );
     }
-
-    // A decade shelf has one meaningful year, so a year sort is offered only on
-    // the "latest" shelf where the range actually spans years.
-    const sortOptions = [
-        { value: 'rating', label: 'Rating' },
-        ...(shelf.id === 'latest' ? [{ value: 'release_year', label: 'Year' }] : []),
-        { value: 'movie_name', label: 'Name' },
-        { value: 'runtime', label: 'Runtime' },
-    ];
 
     return (
         <div className="genre-page">
@@ -41,9 +37,12 @@ export default function EraPage() {
 
             <BrowseGrid
                 filters={filters}
-                title={shelf.displayName}
-                subtitle={shelf.id === 'latest' ? 'Fresh from the last two years' : shelf.caption}
-                sortOptions={sortOptions}
+                title={mood.displayName}
+                subtitle={mood.caption}
+                sortOptions={[
+                    { value: 'rating', label: 'Rating' },
+                    { value: 'movie_name', label: 'Name' },
+                ]}
             />
         </div>
     );

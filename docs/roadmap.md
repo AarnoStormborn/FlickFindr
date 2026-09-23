@@ -57,6 +57,9 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 | **More Like This** | `/flicks/movie/:id/similar`, detail page | Genre-aware embedding neighbours, in a carousel with arrows |
 | **Discovery shelves** | `frontend/src/data/shelves.js` | Latest / Going Retro / Millennium + curated genre rows, with vote floors |
 | **Cinematic redesign** | `frontend/src/index.css` (tokens) · `docs/FRONTEND_DESIGN_INSPIRATION.md` (rationale) | Dark editorial palette, Bodoni Moda / Inter, floating nav. The CSS custom properties are the source of truth — the design doc predates the build and its sample hexes differ |
+| **Mood shelves** | `frontend/src/data/moods.js`, `frontend/src/pages/MoodPage.jsx` | Mind-Bending / Late-Night Thrills / Hidden Gems rows on the home page, each with a See-more page sharing the same filters. Tuned against the catalogue — see the roadmap for the two definitions that were changed and why |
+| **Home language browse** | `frontend/src/pages/MoviesPage.jsx` | A language selector that swaps the shelves for a ranked "Top in <language>" browse, carried in the URL. A mode switch rather than filtering each row, since most of the 88 languages are too small to fill a shelf |
+| **Shared browse grid** | `frontend/src/components/BrowseGrid.jsx` | Genre, era and mood pages were three copies of the same fetch/sort/paginate body; now one component. Also the single place that drops the unusable Metascore sort |
 | **Vote-weighted ranking** | `backend/src/services/rating.ts` | Ranking by raw `rating` put films with ~100 votes at the top of every browse list, ahead of films with tens of thousands. Sorting by rating now uses a Bayesian score — `(v/(v+m))·rating + (m/(v+m))·mean`, m = 1000 — applied everywhere rating is the sort key (browse, filter, search, agent, and the provider backfill). Nothing is hidden: a low-vote film is still returned, just placed by evidence rather than by a small sample |
 | **Where to watch** | `backend/scripts/backfill-providers.ts`, `frontend/src/components/WhereToWatch.jsx` | TMDB/JustWatch providers per region (India + US, switchable); Stream/Rent/Buy on the detail page; on-demand fetch + cache, with a 1,000-film sample backfilled so far |
 | **Language filter** | `backend/scripts/backfill-languages.ts`, `frontend/src/lib/languages.js` | `original_language` for 30,749/30,749 films (88 languages) from a segmented TMDB `/discover` sweep (~3.3k requests, not ~31k per-movie lookups); filter on search + filter form, and the agent honours "only French films" |
@@ -69,14 +72,48 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 
 ## Next up
 
+### Mood & occasion collections — *shipped (3 of 4)*
+- Mood rows on the home page, each cutting across genres: **Mind-Bending**
+  (twisty mysteries), **Late-Night Thrills** (horror), **Hidden Gems** (well
+  rated, under 5,000 votes). Each has a "See more" page driven by the same
+  filters, so the row and the page cannot disagree.
+- Every definition was tuned against the catalogue and the films read back
+  before shipping. Two corrections came out of that: a Thriller filter returned
+  the same films as the top-rated row (so Late-Night Thrills uses Horror), and
+  Hidden Gems needed a vote *ceiling* plus a recency cap — without them it was
+  the top-rated list again, or a list of 2026 releases with unsettled ratings.
+- **`Short & Sweet` (under 100 min) is not shippable yet** — see the runtime
+  note below.
+- **The semantic path does not work for moods yet.** `Mind-Bending` was meant to
+  be a semantic query ("a film that bends reality") and was tried first: the
+  embedding model has no popularity prior, so "a young wizard at a magic school"
+  ranks two films with 61 and 861 votes above Harry Potter (30,141). Moods that
+  want a *vibe* need Search relevance before they can use it; until then they are
+  filters, which the data supports well.
+
+### Home language browse — *shipped*
+- A language selector on the home page: choosing one replaces the shelves with a
+  ranked "Top in <language>" browse, carried in the URL (`?lang=hi`) so it is
+  shareable and survives a reload. Clear restores the shelves.
+- Deliberately a mode switch rather than filtering every row: most of the 88
+  languages are small (Swedish is 143 films), so scoped rows would return empty,
+  and an empty shelf is worse than none.
+
+### Runtime & revenue backfill — **blocked work, data gap**
+- `runtime` is populated for **510 of 30,749 films (1.7%)** and `metascore` for
+  **none**, both verified in production. Consequences: the existing "Sort by
+  Runtime" control ranks almost nothing, the runtime badge on cards is absent,
+  and `Short & Sweet` cannot be built.
+- Recoverable: `tools/load-backend/backfill.py` fills runtime + gross from TMDB
+  one film at a time (~30k calls, resumable, `--concurrency`). Same shape as the
+  trailer/provider work, so it belongs on the Pi ingest schedule.
+- **Not recoverable: `metascore`.** TMDB carries no Metacritic score, so the
+  badge and its sort control were dead UI and have been removed rather than left
+  to look broken. Sourcing it would mean a different provider.
+
 ### Surprise me
 - One button → a random highly-rated film; optional constraint (genre, under 2h).
 - Cheap: one endpoint over the existing structural search + a button in the hero.
-
-### Mood & occasion collections
-- Editorial shelves a non-tech person relates to: Date Night, Rainy Sunday,
-  Need a Laugh, Under 100 min, Oscar Winners.
-- Cheap: saved structural searches with pretty titles — extends `data/shelves.js`.
 
 ### Explainable semantic results
 - For describe-the-plot searches, show *why* each result matched (matched plot

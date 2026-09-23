@@ -34,6 +34,7 @@ export const StructuralSearchRequestSchema = z.object({
   min_year: z.number().int().min(1880).max(2100).optional(),
   max_year: z.number().int().min(1880).max(2100).optional(),
   min_votes: z.number().int().min(0).optional(),
+  max_votes: z.number().int().min(0).optional(),
   /** TMDB `original_language` code, e.g. "en", "hi", "fr". */
   language: z.string().min(2).max(8).optional(),
   sort_by: SortBySchema,

@@ -105,6 +105,12 @@ export function buildStructuralQuery(req: StructuralSearchRequest): StructuralQu
     whereParams.push(req.min_votes);
     where.push(`NULLIF(votes, '')::int >= $${whereParams.length}`);
   }
+  if (req.max_votes !== undefined) {
+    // The upper bound is what makes "Hidden Gems" possible: a rating floor
+    // alone just re-lists the blockbusters with a different ordering.
+    whereParams.push(req.max_votes);
+    where.push(`NULLIF(votes, '')::int <= $${whereParams.length}`);
+  }
   if (req.language) {
     // Exact, case-insensitive code match. Rows whose language was never
     // resolved (original_language IS NULL) are excluded, which is correct:

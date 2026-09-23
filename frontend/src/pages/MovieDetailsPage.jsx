@@ -149,11 +149,6 @@ export default function MovieDetailsPage() {
                                     {languageName(movie.original_language)}
                                 </div>
                             )}
-                            {movie.metascore && movie.metascore > 0 && (
-                                <div className={`meta-item metascore ${movie.metascore >= 60 ? 'good' : movie.metascore >= 40 ? 'mixed' : 'bad'}`}>
-                                    {movie.metascore}
-                                </div>
-                            )}
                         </div>
 
                         {/* Body: content on the left, "where to watch" beside it */}
