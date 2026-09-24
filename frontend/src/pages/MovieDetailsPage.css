@@ -11,7 +11,7 @@
 /* Back Button */
 .back-button {
     position: fixed;
-    top: var(--nav-offset);
+    top: calc(var(--nav-offset) + var(--space-sm));
     left: var(--space-lg);
     display: flex;
     align-items: center;
