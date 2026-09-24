@@ -19,6 +19,9 @@ vi.mock('../api/movies', () => ({
     getLanguages: vi.fn(),
     semanticSearch: vi.fn(),
     hybridSearch: vi.fn(),
+    // The page imports this constant; a mocked module has to re-export it or the
+    // import resolves to undefined and every cap assertion silently changes.
+    MAX_RESULTS: 100,
 }));
 
 const emptyPage = { results: [], total: 0, skip: 0, limit: 30, has_more: false };
