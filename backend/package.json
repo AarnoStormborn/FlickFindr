@@ -1,7 +1,7 @@
 {
   "name": "flickfindr-backend",
   "version": "2.0.0",
-  "description": "FlickFindr API — TypeScript backend (Fastify + Postgres/pgvector + Pi SDK agents)",
+  "description": "FlickFindr API \u2014 TypeScript backend (Fastify + Postgres/pgvector + Pi SDK agents)",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -18,7 +18,8 @@
     "check": "tsx scripts/check.ts",
     "backfill:languages": "tsx scripts/backfill-languages.ts",
     "backfill:providers": "tsx scripts/backfill-providers.ts",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "eval:relevance": "tsx scripts/eval-relevance.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.84.3",

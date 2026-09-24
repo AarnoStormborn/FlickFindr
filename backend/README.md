@@ -64,6 +64,25 @@ No `.env` is required at boot — config ships dev defaults matching
 | `npm run backfill:languages` | fill `original_language` from TMDB (resumable; `-- --fill` for the per-movie remainder) |
 | `npm run backfill:providers` | fill `watch_providers` (India + US) from TMDB; `-- --limit N` or `--all` |
 | `npm run check` | env/catalog/agent health report |
+| `npm run eval:relevance` | score describe-the-plot search against `scripts/relevance-queries.ts` (hits@10 + MRR + long-tail diagnostics); `-- --via-agent` to mirror the live LLM-rewrite path, `--json` for machine output |
+
+### Relevance tuning
+
+Plot search ranks by `similarity + SEMANTIC_VOTE_WEIGHT * log-scaled votes`, and
+`SEMANTIC_VOTE_WEIGHT` (default `0.12`, in `src/services/semantic.ts`) is meant to
+be swept rather than guessed at:
+
+```bash
+cd backend
+for w in 0 0.08 0.12 0.2; do
+  echo -n "W=$w  "; SEMANTIC_VOTE_WEIGHT=$w npm run eval:relevance | grep -E "hits@10|MRR" | tr '\n' ' '; echo
+done
+```
+
+The eval set deliberately contains films with a few hundred votes whose plots are
+unmistakable. They are the guard against a prior that is too strong: at 0.12 the
+237-vote guard holds its unweighted rank, at 0.2 it slips, and at 0.25 it leaves
+the top ten — so raising the weight past ~0.2 costs long-tail retrieval.
 
 ## Agent mode
 

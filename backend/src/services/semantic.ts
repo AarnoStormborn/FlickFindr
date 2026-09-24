@@ -4,6 +4,41 @@ import { toMovieResult } from "./structural.js";
 
 export const SIMILARITY_THRESHOLD = 0.6;
 
+/**
+ * How far a film's prominence may lift it above raw plot similarity.
+ *
+ * Ranking on cosine similarity alone meant a plot that literally restated the
+ * query beat the famous film it described: "a young wizard at a magic school"
+ * put a 61-vote film and an 861-vote film above Harry Potter (30,141 votes),
+ * and "a lonely astronaut stranded in space" did the same to The Martian. The
+ * embedding has no idea what a film is; only how its plot reads.
+ *
+ * The boost is deliberately mild and saturating: it is `weight *` a 0..1 curve,
+ * so the most any film can gain is the weight itself, and the difference between
+ * 100 votes and 40,000 votes is worth less than a typical similarity gap. That
+ * keeps a distinctive low-vote film (Primer, Coherence) findable — the eval set
+ * carries four such films specifically to catch an over-eager prior.
+ *
+ * `SEMANTIC_VOTE_WEIGHT` overrides it, purely so the weight can be swept against
+ * `npm run eval:relevance` instead of guessed at. The default sits where the eval
+ * peaks without costing long-tail retrieval: at 0.12 the score is 21/38 hits
+ * (55.3%) and MRR 0.332 versus 15/38 (39.5%) and 0.230 unweighted, while a
+ * 237-vote film that a precise query describes still ranks 7th, exactly as it did
+ * unweighted. Push to 0.2 and that film slips to 9th; 0.25 pushes it out of the
+ * top ten entirely, which is the point of having it in the fixture.
+ */
+export const POPULARITY_WEIGHT = Number(process.env.SEMANTIC_VOTE_WEIGHT ?? "0.12");
+
+/**
+ * 0..1 prominence from the vote count, log-scaled because the distribution is
+ * heavily skewed (median ~300 votes, max ~41k) and saturating at 50k so the
+ * handful of enormous titles cannot keep separating from each other.
+ *
+ * `votes` is text, hence the cast; a missing count contributes nothing.
+ */
+const POPULARITY_SQL = `(${POPULARITY_WEIGHT} * LEAST(1.0,
+  ln((1 + COALESCE(NULLIF(votes, '')::int, 0))::numeric) / ln(50001::numeric)))`;
+
 const SIMILARITY_SELECT = `${"id, movie_name, release_year, original_language, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url"},\n  1 - (plot_embedding <=> CAST($1 AS vector)) AS similarity_score`;
 
 function toSemanticResult(row: Record<string, unknown>): MovieResult {
@@ -54,7 +89,7 @@ export const semanticService = {
         `SELECT ${SIMILARITY_SELECT}
          FROM movies
          WHERE plot_embedding IS NOT NULL
-         ORDER BY plot_embedding <=> CAST($1 AS vector)
+         ORDER BY (1 - (plot_embedding <=> CAST($1 AS vector)) + ${POPULARITY_SQL}) DESC, id ASC
          LIMIT $2 OFFSET $3`,
         [vec, req.limit, skip],
       );
@@ -128,7 +163,7 @@ export const semanticService = {
         const sql = `SELECT ${SIMILARITY_SELECT}
           FROM movies
           WHERE ${whereSql}
-          ORDER BY plot_embedding <=> CAST($1 AS vector), id ASC
+          ORDER BY (1 - (plot_embedding <=> CAST($1 AS vector)) + ${POPULARITY_SQL}) DESC, id ASC
           LIMIT $${filterValues.length + 2} OFFSET $${filterValues.length + 3}`;
         const dataParams = [vec, ...filterValues, req.limit, skip];
 
