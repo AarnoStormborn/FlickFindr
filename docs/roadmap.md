@@ -172,11 +172,40 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   when the strict conjunction is empty, and language deliberately sits outside
   that: relaxing it would hand back the exact films the viewer excluded.
 
-### Search relevance
-- Plot-language search (semantic/hybrid) returns thematically loose results for
-  some queries — the embedding model is small (MiniLM) and the catalogue is
-  curated. Candidates: reranking, a stronger embedding model, or leaning on the
-  agent to filter before display (as `show_movies` now does).
+### Search relevance — *ranking fixed; retrieval is the remaining gap*
+- Plot search ranked on cosine similarity **alone**, so a plot that literally
+  restated the query beat the famous film it described: a 61-vote film outranked
+  Harry Potter (30,141 votes), and a 243-vote film outranked The Martian.
+- Ranking now adds a bounded, log-scaled prominence term (`SEMANTIC_VOTE_WEIGHT`,
+  default 0.12). Measured with a committed eval set (`npm run eval:relevance`,
+  38 queries, hits@10 + MRR):
+
+  | | unweighted | weighted |
+  |---|---|---|
+  | raw query | 15/38 (39.5%), MRR 0.230 | **21/38 (55.3%), MRR 0.332** |
+  | via the LLM rewrite (the live path) | 14/38 (36.8%), MRR 0.190 | **20/38 (52.6%), MRR 0.294** |
+
+  Six queries gained and none lost on both paths. The weight sits where the gain
+  stops being free: a 237-vote film a precise query describes holds its unweighted
+  rank 7th at 0.12, slips to 9th at 0.2, and leaves the top ten at 0.25. Two other
+  long-tail guards are too obscure for the retriever at *every* weight, so they are
+  recorded as known misses rather than blamed on the prior.
+- **The LLM rewrite is currently a slight drag, and is the next lever.**
+  `/search/semantic` embeds the agent's rewrite rather than what the user typed,
+  which measured *worse* than the raw query at every weight (14 vs 15 unweighted)
+  and costs precision on distinctive queries: "a suicidal woman is saved on a
+  Paris bridge by a knife thrower" becomes "suicidal woman saved by knife thrower
+  who makes her his target", dropping the location, and the intended film leaves
+  the top ten at **any** weight. The rewrite prompt is the cheapest remaining win,
+  and the eval set can measure it.
+- **Still open: retrieval quality.** The embeddings are 384-dim MiniLM over plot
+  text alone — no title, genre or year — so films with similar plots cannot be
+  separated, and some canonical answers never surface at all ("gruesome murders in
+  a rainy city" retrieves Se7en only via the rewrite). Next steps, both needing a
+  full re-embed and both judgeable by the same eval set: embed a richer document
+  (title + year + genres + plot), and/or swap to a stronger 384-dim model.
+- Also still worth doing: showing *why* a result matched (matched plot snippet +
+  similarity), which builds trust in the differentiator.
 
 ---
 

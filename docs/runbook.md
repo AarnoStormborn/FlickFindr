@@ -188,6 +188,21 @@ npm run backfill:providers -- --all         # whole catalogue
   outrank well-known ones ("a young wizard at a magic school" put two films with
   61 and 861 votes above Harry Potter). Define moods in `frontend/src/data/moods.js`
   with filters until Search relevance lands.
+- **Plot search depends on the agent, and the rewrite is part of ranking.**
+  `/search/semantic` and `/search/hybrid` run the query through the LLM parser and
+  embed the *interpreted* query, not the user's words (falling back to the raw
+  query when the agent is disabled or fails). Measured against the eval set, that
+  rewrite is currently a slight net *negative* (14/38 vs 15/38 hits) and drops
+  distinctive nouns ("Paris bridge"), so a query can fail because of the rewrite
+  rather than the embeddings. When debugging relevance, check what was embedded:
+  `npm run eval:relevance -- --via-agent --verbose` prints it, and the rewrites are
+  cached at `/tmp/flickfindr-agent-rewrites.json`.
+- **Ranking relevance is measured, not eyeballed.** `npm run eval:relevance` scores
+  plot search against `scripts/relevance-queries.ts` (hits@10, MRR, plus mean votes
+  and distinct top-1s to catch a ranker that has stopped reading the query). Run it
+  before and after touching ranking or retrieval. The vote weight is
+  `SEMANTIC_VOTE_WEIGHT` (default 0.12); above ~0.2 the long-tail guards in the
+  fixture start to fail, which is what they are there for.
 - **Ranked queries must break ties by `id`.** Without a tiebreaker, `OFFSET`
   paging on a tied sort repeats some rows and silently skips others.
 - **Sorting by rating means the vote-weighted score, not the raw column**
