@@ -27,6 +27,16 @@ function resolveApiBase() {
 
 export const API_BASE_URL = resolveApiBase();
 
+/**
+ * The deepest any ranked search or browse may paginate, mirroring `MAX_RESULTS`
+ * in `backend/src/models.ts` — the server rejects a `skip` beyond it with a 400.
+ *
+ * Shared rather than redeclared per page: the first time a browse page computed
+ * its page count from the *uncapped* total it offered hundreds of pages, and
+ * every click past the fifth failed.
+ */
+export const MAX_RESULTS = 100;
+
 const responseCache = new Map();
 const inflight = new Map();
 const CACHE_MAX = 200;

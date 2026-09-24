@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MovieCard from './MovieCard';
-import { searchMovies } from '../api/movies';
+import { searchMovies, MAX_RESULTS } from '../api/movies';
 import LoadingQuips from './LoadingQuips';
 
 const MOVIES_PER_PAGE = 20;
@@ -77,7 +77,11 @@ export default function BrowseGrid({
         setPage(0);
     };
 
-    const totalPages = Math.ceil(total / MOVIES_PER_PAGE);
+    // The API refuses a skip beyond MAX_RESULTS, so the UI must not offer pages
+    // it cannot fetch. A genre with 13,540 films still shows only the first 100,
+    // and paging is capped to match instead of failing on page 6.
+    const reachable = Math.min(total, MAX_RESULTS);
+    const totalPages = Math.ceil(reachable / MOVIES_PER_PAGE);
 
     return (
         <>
@@ -85,7 +89,9 @@ export default function BrowseGrid({
                 <h1 className="genre-title">{title}</h1>
                 <p className="genre-count">
                     {subtitle ? `${subtitle} · ` : ''}
-                    {total.toLocaleString()} {countLabel}
+                    {total > MAX_RESULTS
+                        ? `Top ${MAX_RESULTS} of ${total.toLocaleString()} ${countLabel}`
+                        : `${total.toLocaleString()} ${countLabel}`}
                 </p>
             </header>
 

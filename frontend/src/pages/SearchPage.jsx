@@ -5,7 +5,7 @@ import MovieListTable from '../components/MovieListTable';
 import ViewToggle from '../components/ViewToggle';
 import MetadataForm from '../components/MetadataForm';
 import { languageName } from '../lib/languages';
-import { getLanguages, hybridSearch, semanticSearch, searchMovies } from '../api/movies';
+import { getLanguages, hybridSearch, MAX_RESULTS, semanticSearch, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
 import useSearchHistory from '../hooks/useSearchHistory';
 import './SearchPage.css';
@@ -103,11 +103,10 @@ export default function SearchPage() {
     const activeSearchRef = useRef(null); // descriptor for load-more
 
     // 20 per page, and never past the top 100 — a ranked recommendation list
-    // does not need to page through all ~31k films. MAX_RESULTS mirrors the
-    // server's own cap (`MAX_RESULTS` in backend/src/models.ts), which rejects
-    // a skip beyond it; keep the two in step.
+    // does not need to page through all ~31k films. MAX_RESULTS is imported from
+    // the API module, where it mirrors the server's cap; it used to be redeclared
+    // here, which is how a later page quietly drifted out of step.
     const PAGE_SIZE = 20;
-    const MAX_RESULTS = 100;
 
     // Monotonic generation: responses from an older mode/search are ignored.
     const generationRef = useRef(0);

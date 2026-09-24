@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import BrowseGrid from './BrowseGrid';
@@ -128,5 +129,39 @@ describe('BrowseGrid', () => {
         await waitFor(() => expect(screen.getByText(/Page 1 of 3/)).toBeInTheDocument());
         expect(screen.getByRole('button', { name: /Previous/ })).toBeDisabled();
         expect(screen.getByRole('button', { name: /Next/ })).not.toBeDisabled();
+    });
+
+    it('never pages past the server cap, and says so', async () => {
+        // Reported from the home page: "See more" on any row failed from page 5
+        // onwards. The API rejects a skip beyond MAX_RESULTS (100) with a 400,
+        // but the page count was computed from the uncapped total, so a genre
+        // with 13,540 films offered 677 pages of which 672 could only fail.
+        const calls = stubFetch([film(1, 'Memento')], 13540);
+        renderGrid(<BrowseGrid filters={{ genre: 'Drama' }} title="Drama Movies" />);
+
+        // 100 reachable results at 20 per page is five pages, not 677.
+        await waitFor(() => expect(screen.getByText(/Page 1 of 5/)).toBeInTheDocument());
+        // The count is honest about the window rather than implying 13,540.
+        expect(screen.getByText(/Top 100 of 13,540 movies/)).toBeInTheDocument();
+
+        // Walk to the last page; Next must disable rather than request page 6.
+        for (let i = 0; i < 4; i += 1) {
+            await userEvent.click(screen.getByRole('button', { name: /Next/ }));
+            await waitFor(() => expect(screen.getByText(new RegExp(`Page ${i + 2} of 5`))).toBeInTheDocument());
+        }
+        expect(screen.getByText(/Page 5 of 5/)).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole('button', { name: /Next/ })).toBeDisabled());
+
+        // The regression itself: every request must stay inside the window.
+        const skips = calls.map((c) => c.body.skip).filter((s) => s !== undefined);
+        expect(skips).toEqual([0, 20, 40, 60, 80]);
+        expect(skips.every((s) => s <= 99)).toBe(true);
+    });
+
+    it('shows the plain count when everything fits in the window', async () => {
+        stubFetch([film(1, 'Memento')], 45);
+        renderGrid(<BrowseGrid filters={{ genre: 'Film-Noir' }} title="A" countLabel="movies found" />);
+        await waitFor(() => expect(screen.getByText(/45 movies found/)).toBeInTheDocument());
+        expect(screen.queryByText(/Top 100 of/)).toBeNull();
     });
 });
