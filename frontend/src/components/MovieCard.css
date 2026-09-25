@@ -70,6 +70,28 @@
 }
 
 /* Release Year Badge */
+/* Why a plot-search result is here. Bottom-left so it never collides with the
+   rating (top-left) or the year (top-right). */
+.movie-card-match {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    max-width: calc(100% - 20px);
+    padding: 3px 8px;
+    background: rgba(10, 10, 12, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(217, 164, 65, 0.35);
+    border-radius: 999px;
+    color: var(--accent-gold);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .movie-card-year {
     position: absolute;
     top: 10px;

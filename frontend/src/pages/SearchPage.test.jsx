@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SearchPage from './SearchPage';
-import { searchMovies, getLanguages } from '../api/movies';
+import { searchMovies, getLanguages, semanticSearch } from '../api/movies';
 
 /**
  * Guards the seam that broke twice: a filter is visible in the UI and present
@@ -165,5 +165,47 @@ describe('SearchPage caps results at the top 100', () => {
         await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(40));
         // 100 - 40 = 60 remaining, so pages continue 20 at a time to exactly 100.
         expect(searchMovies.mock.calls.at(-1)[0]).toMatchObject({ limit: 20, skip: 20 });
+    });
+});
+
+/**
+ * Plot-based searches rank by embedding similarity, which is otherwise invisible.
+ * The label is relative to the closest result on the page (similarities are not
+ * comparable between queries), and the structural mode must stay untouched — it
+ * has no similarity to explain.
+ */
+describe('SearchPage explains the plot ranking', () => {
+    const semanticPage = {
+        results: [
+            { id: 1, movie_name: 'Titanic', rating: 7.9, similarity_score: 0.5 },
+            { id: 2, movie_name: 'The Icebreaker', rating: 6.1, similarity_score: 0.41 },
+            { id: 3, movie_name: 'Coherence', rating: 7.2, similarity_score: 0.3 },
+        ],
+        total: 3,
+        skip: 0,
+        limit: 20,
+        has_more: false,
+        exact_matches: false,
+        message: 'No exact matches found, but here are some similar movies',
+    };
+
+    it('labels each result relative to the closest, and says how it ranked', async () => {
+        vi.mocked(semanticSearch).mockReset().mockResolvedValue(semanticPage);
+        renderAt('/search?mode=semantic&q=a+ship+hits+an+iceberg');
+
+        await waitFor(() => expect(screen.getByText(/Ranked by how closely/)).toBeInTheDocument());
+        const badges = [...document.querySelectorAll('.movie-card-match')].map((b) => b.textContent);
+        expect(badges).toEqual(['Closest match', 'Related match', 'Loose match']); // 100%, 82%, 60%
+        // The reason is on the badge itself, not only in prose above the grid.
+        expect(document.querySelector('.movie-card-match')?.getAttribute('title')).toContain(
+            'how closely the plot reads like your description',
+        );
+    });
+
+    it('does not explain a ranking the structural mode does not use', async () => {
+        renderAt('/search?mode=structural&genre=Drama');
+        await waitFor(() => expect(searchMovies).toHaveBeenCalled());
+        expect(screen.queryByText(/Ranked by how closely/)).toBeNull();
+        expect(document.querySelectorAll('.movie-card-match')).toHaveLength(0);
     });
 });

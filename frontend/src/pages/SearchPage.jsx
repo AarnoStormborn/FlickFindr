@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MovieCard from '../components/MovieCard';
 import MovieListTable from '../components/MovieListTable';
+import { matchLabel } from '../lib/matchLabel';
 import ViewToggle from '../components/ViewToggle';
 import MetadataForm from '../components/MetadataForm';
 import { languageName } from '../lib/languages';
@@ -339,6 +340,15 @@ export default function SearchPage() {
     };
 
     const showSearchBar = TEXT_MODES.includes(mode);
+    // Plot-based modes return a similarity per result; the structural mode does
+    // not, so there is nothing to explain there. The label is relative to the best
+    // score in this result set, because embedding similarities are not comparable
+    // across different queries.
+    const isPlotSearch = TEXT_MODES.includes(mode);
+    const topSimilarity = isPlotSearch
+        ? Math.max(...results.map((r) => (typeof r.similarity_score === 'number' ? r.similarity_score : 0)), 0)
+        : 0;
+    const labelFor = (movie) => matchLabel(movie.similarity_score, topSimilarity);
     const activeStructuralFilters = mode === 'structural' ? urlFilters : null;
 
     const visibleTotal = Math.min(typeof meta?.total === 'number' ? meta.total : 0, MAX_RESULTS);
@@ -427,6 +437,12 @@ export default function SearchPage() {
                                             : `${meta.total.toLocaleString()} matches`}
                                     </p>
                                 )}
+                                {isPlotSearch && results.length > 0 && (
+                                    <p className="search-message search-ranking-note">
+                                        Ranked by how closely each film&apos;s plot matches your
+                                        description, then by how well known it is.
+                                    </p>
+                                )}
                             </div>
                             <ViewToggle view={view} onChange={setView} />
                         </div>
@@ -442,7 +458,7 @@ export default function SearchPage() {
                 {!loading && !error && results.length > 0 && (view === 'grid' ? (
                     <div className="search-grid">
                         {results.map((movie) => (
-                            <MovieCard key={movie.id} movie={movie} />
+                            <MovieCard key={movie.id} movie={movie} matchLabel={labelFor(movie)} />
                         ))}
                     </div>
                 ) : (

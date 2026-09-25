@@ -159,6 +159,13 @@
     font-size: var(--font-size-sm);
 }
 
+/* The ranking note is an aside, not a result count — kept quieter than the
+   messages above it. */
+.search-ranking-note {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
 .search-message.exact {
     color: #8fbf8a;
 }
