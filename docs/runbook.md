@@ -191,18 +191,28 @@ npm run backfill:providers -- --all         # whole catalogue
 - **Plot search depends on the agent, and the rewrite is part of ranking.**
   `/search/semantic` and `/search/hybrid` run the query through the LLM parser and
   embed the *interpreted* query, not the user's words (falling back to the raw
-  query when the agent is disabled or fails). Measured against the eval set, that
-  rewrite is currently a slight net *negative* (14/38 vs 15/38 hits) and drops
-  distinctive nouns ("Paris bridge"), so a query can fail because of the rewrite
-  rather than the embeddings. When debugging relevance, check what was embedded:
-  `npm run eval:relevance -- --via-agent --verbose` prints it, and the rewrites are
-  cached at `/tmp/flickfindr-agent-rewrites.json`.
+  query when the agent is disabled or fails). The prompt is load-bearing: when it
+  asked for a short "theme", it deleted the details that make a film findable ("a
+  **Paris bridge**") and scored worse than embedding the raw query at every weight.
+  It now requires concrete detail and rewards expanding references. When debugging
+  relevance, check what was embedded: `npm run eval:relevance -- --via-agent
+  --verbose` prints it, and rewrites are cached at
+  `/tmp/flickfindr-agent-rewrites.json`. Delete that file to see fresh rewrites —
+  otherwise you are re-scoring old text.
+- **The embedded document is TMDB's marketing blurb, and it withholds the premise.**
+  Plot vectors are built from `plot` alone, which is a one-line overview written to
+  avoid spoilers: The Sixth Sense never says the boy sees dead people, and Titanic
+  never says "iceberg". Some queries therefore cannot retrieve the right film with
+  *any* model or ranking. Enriching the document (keywords, genre, year, title) is
+  the fix; keywords need a per-film TMDB backfill.
 - **Ranking relevance is measured, not eyeballed.** `npm run eval:relevance` scores
   plot search against `scripts/relevance-queries.ts` (hits@10, MRR, plus mean votes
   and distinct top-1s to catch a ranker that has stopped reading the query). Run it
   before and after touching ranking or retrieval. The vote weight is
   `SEMANTIC_VOTE_WEIGHT` (default 0.12); above ~0.2 the long-tail guards in the
-  fixture start to fail, which is what they are there for.
+  fixture start to fail, which is what they are there for. The fixture also holds
+  five colloquial queries ("the spinning top dream movie") because those are the
+  case that justifies the agent call at all, and they must not regress.
 - **Ranked queries must break ties by `id`.** Without a tiebreaker, `OFFSET`
   paging on a tied sort repeats some rows and silently skips others.
 - **Sorting by rating means the vote-weighted score, not the raw column**

@@ -200,4 +200,29 @@ export const RELEVANCE_QUERIES: RelevanceCase[] = [
         query: "a mother conceives and raises her daughter to become the perfect woman of the future",
         expect: [f("The Red Virgin", 2024)], // 182 votes
     },
+
+    // --- Colloquial queries: the case a rewrite is supposed to earn its keep on.
+    // --- Indirect references and shorthand that the plot text does not contain
+    // --- literally. If the LLM rewrite cannot beat embedding these as typed, it
+    // --- is costing latency and money on the semantic path for nothing.
+    {
+        query: "the one with the blue aliens on pandora",
+        expect: [f("Avatar", 2009)],
+    },
+    {
+        query: "the movie where the kid sees dead people",
+        expect: [f("The Sixth Sense", 1999)],
+    },
+    {
+        query: "the spinning top dream movie",
+        expect: [f("Inception", 2010)],
+    },
+    {
+        query: "that film about the ship hitting an iceberg",
+        expect: [f("Titanic", 1997)],
+    },
+    {
+        query: "the one about erasing someone from your memory after a breakup",
+        expect: [f("Eternal Sunshine of the Spotless Mind", 2004)],
+    },
 ];
