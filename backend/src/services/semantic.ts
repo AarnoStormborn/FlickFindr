@@ -20,14 +20,23 @@ export const SIMILARITY_THRESHOLD = 0.6;
  * carries four such films specifically to catch an over-eager prior.
  *
  * `SEMANTIC_VOTE_WEIGHT` overrides it, purely so the weight can be swept against
- * `npm run eval:relevance` instead of guessed at. The default sits where the eval
- * peaks without costing long-tail retrieval: at 0.12 the score is 21/38 hits
- * (55.3%) and MRR 0.332 versus 15/38 (39.5%) and 0.230 unweighted, while a
- * 237-vote film that a precise query describes still ranks 7th, exactly as it did
- * unweighted. Push to 0.2 and that film slips to 9th; 0.25 pushes it out of the
- * top ten entirely, which is the point of having it in the fixture.
+ * `npm run eval:relevance` instead of guessed at. The two weights interact, so they
+ * were swept together once the keyword vector existed (43-query set, keyword weight
+ * 0.5 unless noted):
+ *
+ *   vote weight   hits@10        MRR     a 136-vote film's rank for its own query
+ *     0.12        25/43 (58.1%)  0.298    7th
+ *     0.15        25/43          0.310    8th
+ *     0.18        26/43 (60.5%)  0.349    8th   <- chosen
+ *     0.20        27/43 (62.8%)  0.364   10th
+ *     0.25        27/43          0.382    gone
+ *
+ * 0.20 and 0.25 score marginally better on the aggregate, but the aggregate is
+ * dominated by queries naming well-known films — which is precisely the bias the
+ * fixture's long-tail guards exist to expose. 0.18 keeps a real margin on the film
+ * that a precise query describes while still taking nearly all of the gain.
  */
-export const POPULARITY_WEIGHT = Number(process.env.SEMANTIC_VOTE_WEIGHT ?? "0.12");
+export const POPULARITY_WEIGHT = Number(process.env.SEMANTIC_VOTE_WEIGHT ?? "0.18");
 
 /**
  * 0..1 prominence from the vote count, log-scaled because the distribution is

@@ -231,7 +231,14 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   varying): 0 → 22/43 (51.2%) / MRR 0.265, 0.25 → 24/43, 0.4 → 24/43 / 0.297,
   **0.5 → 25/43 (58.1%) / MRR 0.298**, 0.6 → 26/43 / 0.296, 1.0 → 24/43.
   At 0.5 three queries are gained and none lost, including the iceberg query that
-  previously could not be answered at all.
+  previously could not be answered at all. Once the keyword vector existed the two
+  weights were swept **together** (they interact): `keyword 0.5 / votes 0.18` gives
+  **26/43 (60.5%) and MRR 0.349**, against 25/43 and 0.298 at the old vote weight.
+  Higher vote weights score marginally better on the aggregate — 0.20 → 27/43, 0.25
+  → 27/43 with MRR 0.382 — but the aggregate is dominated by queries naming
+  well-known films, and at 0.20 the fixture's 136-vote guard film sits at rank 10,
+  one position from dropping out of its own query. The lower weight keeps a real
+  margin on long-tail retrieval, which is the reason those films are in the fixture.
 - **The embedding model: measured, and deferred on evidence.** MiniLM was compared
   against `bge-small-en-v1.5` (the strongest 384-dim alternative) on the ranking that
   the keyword vector exists to fix. Each model was used with its own correct pooling

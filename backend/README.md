@@ -86,7 +86,7 @@ cd backend
 for w in 0 0.25 0.4 0.5 0.6 1.0; do
   echo -n "kw=$w  "; SEMANTIC_KEYWORD_WEIGHT=$w npm run eval:relevance | grep -E "hits@10|MRR" | tr '\n' ' '; echo
 done
-for w in 0 0.08 0.12 0.2; do
+for w in 0.12 0.18 0.2 0.25; do
   echo -n "votes=$w  "; SEMANTIC_VOTE_WEIGHT=$w npm run eval:relevance | grep -E "hits@10|MRR" | tr '\n' ' '; echo
 done
 ```
@@ -97,10 +97,12 @@ production. Change `src/services/embeddingText.ts`, not the scripts — both
 generators use it precisely so local and production cannot disagree about what a
 vector means.
 
-The eval set deliberately contains films with a few hundred votes whose plots are
-unmistakable. They are the guard against a prior that is too strong: at 0.12 the
-237-vote guard holds its unweighted rank, at 0.2 it slips, and at 0.25 it leaves
-the top ten — so raising the weight past ~0.2 costs long-tail retrieval.
+Sweep the two weights **together** — they interact, and tuning one at a time finds a
+worse optimum. The eval set deliberately contains films with a few hundred votes
+whose plots are unmistakable; they are the guard against a prior that is too strong,
+and the reason the shipped vote weight is 0.18 rather than the 0.25 that scores
+slightly better: at 0.2+ the 136-vote guard film falls to rank 10 and then out of its
+own query altogether.
 
 ## Agent mode
 
