@@ -15,6 +15,14 @@ create table if not exists movies (
   -- "TMDB was asked for a runtime", separate from the value: a film TMDB has no
   -- runtime for keeps runtime NULL rather than being recorded as 0 minutes.
   runtime_checked boolean not null default false,
+  -- Comma-joined TMDB keyword names, and the matching "we asked" flag. These are
+  -- embedded with the plot: overviews withhold the premise (no "iceberg" in
+  -- Titanic), keywords supply it.
+  keywords text,
+  keywords_checked boolean not null default false,
+  -- Second vector for the same query: title + genres + keywords. Kept apart from
+  -- plot_embedding because keywords blended into the plot document displace it.
+  keywords_embedding vector(384),
   genre text,
   metascore float,
   plot text,

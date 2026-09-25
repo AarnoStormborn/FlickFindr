@@ -39,6 +39,43 @@ export const POPULARITY_WEIGHT = Number(process.env.SEMANTIC_VOTE_WEIGHT ?? "0.1
 const POPULARITY_SQL = `(${POPULARITY_WEIGHT} * LEAST(1.0,
   ln((1 + COALESCE(NULLIF(votes, '')::int, 0))::numeric) / ln(50001::numeric)))`;
 
+/**
+ * How much a second, keyword-based vector may contribute alongside the plot one.
+ *
+ * The plot vector is the film's overview. The keyword vector is
+ * `title + genres + keywords`, and it exists because TMDB overviews withhold the
+ * premise: Titanic's never says "iceberg" and The Sixth Sense's never says the boy
+ * sees dead people, so those queries could not retrieve those films at any weight
+ * or with any model. Ranking the whole catalogue by each vector separately showed
+ * how complementary they are — the target film's rank for "that film about the
+ * ship hitting an iceberg":
+ *
+ *   plot vector:     370th
+ *   keyword vector:   13th
+ *
+ * They are deliberately *not* merged into one document: that displaced the plot and
+ * measured as a wash (22/43 hits, six queries gained and six lost). So the plot
+ * term is untouched and the keyword term can only add. Both scores are cosines in
+ * the same range, but a short keyword document scores higher across the board,
+ * hence a weight well below 1.
+ *
+ * Swept against the eval set (43 queries, keyword weight -> hits@10 / MRR):
+ * 0 -> 22/43 / 0.265,  0.25 -> 24/43 / 0.287,  0.4 -> 24/43 / 0.297,
+ * 0.5 -> 25/43 / 0.298,  0.6 -> 26/43 / 0.296,  1.0 -> 24/43 / 0.295.
+ * 0.5 sits at the best MRR in the good region, and at that setting three queries
+ * are gained (two of them at rank 2) with none lost.
+ *
+ * `SEMANTIC_KEYWORD_WEIGHT` overrides it so it can be swept against
+ * `npm run eval:relevance` rather than guessed at.
+ */
+export const KEYWORD_WEIGHT = Number(process.env.SEMANTIC_KEYWORD_WEIGHT ?? "0.5");
+
+/**
+ * The keyword contribution. A NULL keywords_embedding (a film with no keywords at
+ * all) drops out via COALESCE rather than contributing a meaningless similarity.
+ */
+const KEYWORD_SQL = `(${KEYWORD_WEIGHT} * COALESCE(1 - (keywords_embedding <=> CAST($1 AS vector)), 0))`;
+
 const SIMILARITY_SELECT = `${"id, movie_name, release_year, original_language, rating, runtime, genre, metascore, plot, directors, stars, votes, gross, poster_url"},\n  1 - (plot_embedding <=> CAST($1 AS vector)) AS similarity_score`;
 
 function toSemanticResult(row: Record<string, unknown>): MovieResult {
@@ -89,7 +126,7 @@ export const semanticService = {
         `SELECT ${SIMILARITY_SELECT}
          FROM movies
          WHERE plot_embedding IS NOT NULL
-         ORDER BY (1 - (plot_embedding <=> CAST($1 AS vector)) + ${POPULARITY_SQL}) DESC, id ASC
+         ORDER BY (1 - (plot_embedding <=> CAST($1 AS vector)) + ${KEYWORD_SQL} + ${POPULARITY_SQL}) DESC, id ASC
          LIMIT $2 OFFSET $3`,
         [vec, req.limit, skip],
       );
@@ -163,7 +200,7 @@ export const semanticService = {
         const sql = `SELECT ${SIMILARITY_SELECT}
           FROM movies
           WHERE ${whereSql}
-          ORDER BY (1 - (plot_embedding <=> CAST($1 AS vector)) + ${POPULARITY_SQL}) DESC, id ASC
+          ORDER BY (1 - (plot_embedding <=> CAST($1 AS vector)) + ${KEYWORD_SQL} + ${POPULARITY_SQL}) DESC, id ASC
           LIMIT $${filterValues.length + 2} OFFSET $${filterValues.length + 3}`;
         const dataParams = [vec, ...filterValues, req.limit, skip];
 

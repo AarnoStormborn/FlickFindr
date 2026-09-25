@@ -9,20 +9,27 @@
 
 import { getPool, closePool } from "../src/db/pool.js";
 import { batchGenerateEmbeddings, EMBEDDING_DIM } from "../src/embedding.js";
+import { keywordText, plotText } from "../src/services/embeddingText.js";
 import { logger } from "../src/logger.js";
 
 async function main(): Promise<void> {
   const pool = getPool();
+  // The document is built by embeddingText(), shared with the remote generator so
+  // the two can never disagree about what a vector means.
   const { rows } = await pool.query(
-    "SELECT id, plot FROM movies WHERE plot IS NOT NULL AND plot != ''",
+    "SELECT id, movie_name, release_year, genre, keywords, plot FROM movies ORDER BY id",
   );
-  logger.info({ rows: rows.length }, "Plots to embed");
+  logger.info({ rows: rows.length }, "Films to embed (plot + keyword vectors)");
 
   const ids = rows.map((r) => Number(r.id));
-  const texts = rows.map((r) => String(r.plot ?? ""));
+  // Two documents per film, two columns. See src/services/embeddingText.ts.
+  const plotTexts = rows.map((r) => plotText(r));
+  const keywordTexts = rows.map((r) => keywordText(r));
   const embeddings: number[][] = [];
-  for (let i = 0; i < texts.length; i += 32) {
-    embeddings.push(...(await batchGenerateEmbeddings(texts.slice(i, i + 32))));
+  const keywordEmbeddings: number[][] = [];
+  for (let i = 0; i < plotTexts.length; i += 32) {
+    embeddings.push(...(await batchGenerateEmbeddings(plotTexts.slice(i, i + 32))));
+    keywordEmbeddings.push(...(await batchGenerateEmbeddings(keywordTexts.slice(i, i + 32))));
   }
 
   const client = await pool.connect();
@@ -31,9 +38,17 @@ async function main(): Promise<void> {
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const embedding = embeddings[i];
+      const keywordEmbedding = keywordEmbeddings[i];
       if (embedding === undefined) continue;
       const vec = `[${embedding.join(",")}]`;
-      await client.query("UPDATE movies SET plot_embedding = $1::vector WHERE id = $2", [vec, id]);
+      // An empty keyword document means no title/genre/keywords: store NULL rather
+      // than a zero vector, so the keyword term is skipped (COALESCE to 0) instead
+      // of contributing a meaningless similarity.
+      const kwVec = keywordEmbedding && keywordTexts[i] ? `[${keywordEmbedding.join(",")}]` : null;
+      await client.query(
+        "UPDATE movies SET plot_embedding = $1::vector, keywords_embedding = $2::vector WHERE id = $3",
+        [vec, kwVec, id],
+      );
     }
     await client.query("COMMIT");
     logger.info({ updated: ids.length, dim: EMBEDDING_DIM }, "Embeddings stored");

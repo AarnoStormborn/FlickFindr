@@ -199,12 +199,23 @@ npm run backfill:providers -- --all         # whole catalogue
   --verbose` prints it, and rewrites are cached at
   `/tmp/flickfindr-agent-rewrites.json`. Delete that file to see fresh rewrites —
   otherwise you are re-scoring old text.
-- **The embedded document is TMDB's marketing blurb, and it withholds the premise.**
-  Plot vectors are built from `plot` alone, which is a one-line overview written to
-  avoid spoilers: The Sixth Sense never says the boy sees dead people, and Titanic
-  never says "iceberg". Some queries therefore cannot retrieve the right film with
-  *any* model or ranking. Enriching the document (keywords, genre, year, title) is
-  the fix; keywords need a per-film TMDB backfill.
+- **The embedded document is TMDB's marketing blurb, which withholds the premise
+  — hence two vectors.** Plot vectors come from the overview alone: The Sixth
+  Sense's never says the boy sees dead people, Titanic's never says "iceberg".
+  `keywords_embedding` (title + genres + TMDB keywords, weight
+  `SEMANTIC_KEYWORD_WEIGHT`, default 0.5) is searched alongside `plot_embedding`
+  and its cosine is *added*, never blended into the plot document. Ranking by each
+  vector separately is how to check the mechanism: for "that film about the ship
+  hitting an iceberg", Titanic is 370th by plot and 13th by keywords. If you change
+  what either vector contains, `npm run embeddings` re-embeds locally;
+  `npm run embeddings:remote -- --all` does production, and re-embedding is ~7
+  minutes per vector locally.
+- **Keywords come from `npm run backfill:keywords`** (one TMDB
+  `/movie/{id}/keywords` call per film, resumable via `keywords_checked`, ordered
+  most-voted-first). 26,130 of 30,712 films have them. `tmdbGet` retries only when
+  a caller asks (`attempts`), so request-time paths keep their single-shot
+  behaviour while batch jobs retry: without that, one connection reset was recorded
+  as "TMDB has no keywords for this film" — 13 of the first 20 films failed.
 - **Ranking relevance is measured, not eyeballed.** `npm run eval:relevance` scores
   plot search against `scripts/relevance-queries.ts` (hits@10, MRR, plus mean votes
   and distinct top-1s to catch a ranker that has stopped reading the query). Run it

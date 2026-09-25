@@ -209,21 +209,35 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   top ten at *every* weight. The eval set gained a colloquial section to test
   whether the agent earns its latency: on indirect references it does — "the
   spinning top dream movie" now finds Inception, which raw embedding cannot.
-- **Next retrieval step: enrich the embedded document.** Two of the three remaining
-  colloquial failures cannot be fixed with the current text, because the embedded
-  document is TMDB's short marketing overview, which withholds the premise by
-  design. The Sixth Sense's reads "meets a nine year old boy… who is hiding a dark
-  secret" (never mentions seeing the dead); Titanic's never contains the word
-  "iceberg" ("through to its death—on its first and last voyage"). Both rewrites
-  were perfect and still could not match. Adding TMDB keywords — one
-  `/movie/{id}/keywords` call per film, the same shape as the trailer and provider
-  backfills — to make the embedded text `title + year + genres + keywords +
-  overview` is the highest-value retrieval change left, and the eval set scores it.
+- **Retrieval: a second vector for keywords — *shipped*.** The embedded document
+  was TMDB's overview alone, which withholds the premise by design, so some queries
+  could not retrieve the right film *at any weight or with any model*: The Sixth
+  Sense's overview never says the boy sees dead people, Titanic's never says
+  "iceberg". A keywords backfill (30,712 films, 22 minutes, 26,130 with keywords)
+  now feeds a second vector, `keywords_embedding`, built from
+  `title + genres + keywords`, and ranking adds its cosine with a weight of 0.5.
+  Ranking the catalogue by each vector separately showed how complementary they
+  are — the target's rank for "that film about the ship hitting an iceberg":
+  **370th by the plot vector, 13th by the keyword vector**.
+- **Two failed attempts are recorded because they look reasonable and are not.**
+  Merging keywords *into* the plot document measured as a wash (22/43 hits, six
+  queries gained and six lost) — the keyword bag displaced the plot. "Fixing" that
+  by putting the plot first and capping keywords was worse still (18/43). Keeping
+  the vectors apart is what works: the plot term is untouched, so plot-driven
+  queries cannot regress, and the keyword term only adds. A trim of the plot text's
+  trailing punctuation was also measured and reverted (21/43 vs 22/43) — retrieval
+  here is brittle enough that tidying is a regression.
+- **Measured result** (43-query eval set, same vectors, only the keyword weight
+  varying): 0 → 22/43 (51.2%) / MRR 0.265, 0.25 → 24/43, 0.4 → 24/43 / 0.297,
+  **0.5 → 25/43 (58.1%) / MRR 0.298**, 0.6 → 26/43 / 0.296, 1.0 → 24/43.
+  At 0.5 three queries are gained and none lost, including the iceberg query that
+  previously could not be answered at all.
 - **Still open: the embedding model.** 384-dim MiniLM over a short document cannot
-  separate films with similar plots. A stronger 384-dim model is a drop-in (the
-  column is `vector(384)`) but needs a full re-embed of 30,749 films, and is worth
-  judging only after the document is richer — a better model on a premise-free
-  blurb is not obviously a win.
+  separate films with similar plots, and some queries still fail because the
+  keywords do not carry the premise either (The Sixth Sense's do not include
+  "sees dead people"). A stronger 384-dim model is a drop-in (the column is
+  `vector(384)`) but needs a full re-embed of 30,749 films and a second column to
+  match; judge it with the same eval set.
 - Also still worth doing: showing *why* a result matched (matched plot snippet +
   similarity), which builds trust in the differentiator.
 

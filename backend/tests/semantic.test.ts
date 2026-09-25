@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Queryable } from "../src/models.js";
-import { POPULARITY_WEIGHT, SIMILARITY_THRESHOLD, semanticService } from "../src/services/semantic.js";
+import {
+  KEYWORD_WEIGHT,
+  POPULARITY_WEIGHT,
+  SIMILARITY_THRESHOLD,
+  semanticService,
+} from "../src/services/semantic.js";
 
 const embed = async (text: string) => [text.length]; // stub embedding
 
@@ -95,6 +100,33 @@ describe("prominence prior", () => {
     expect(sql).toContain("ln((1 + COALESCE(NULLIF(votes, '')::int, 0))::numeric)");
     // Descending on the combined score, with the id tiebreak kept for paging.
     expect(sql).toMatch(/ORDER BY \(1 - \(plot_embedding <=> CAST\(\$1 AS vector\)\).*\) DESC, id ASC/s);
+  });
+
+  it("combines a second keyword vector without touching the plot term", async () => {
+    const statements: string[] = [];
+    const db: Queryable = {
+      async query(statement: string) {
+        statements.push(statement);
+        return { rows: [] };
+      },
+    };
+    await semanticService.semanticSearch(db, { query: "an iceberg", limit: 5, skip: 0 }, embed);
+    const sql = statements.find((s) => s.includes("ORDER BY")) ?? "";
+
+    // The plot similarity stays a first-class term: keywords are added alongside
+    // it, never blended into the same document (measured as a wash that way).
+    expect(sql).toContain("1 - (plot_embedding <=> CAST($1 AS vector))");
+    expect(sql).toContain("keywords_embedding");
+    // A film with no keywords contributes nothing rather than a bogus cosine.
+    expect(sql).toContain("COALESCE(1 - (keywords_embedding <=> CAST($1 AS vector)), 0)");
+  });
+
+  it("keeps the keyword weight below the point where it drowns the plot", () => {
+    // Swept with `npm run eval:relevance`: hits@10 rises to a peak around 0.5-0.6
+    // and falls again by 1.0, where the short keyword documents (which score
+    // higher across the board) start to dominate the longer plot ones.
+    expect(KEYWORD_WEIGHT).toBeGreaterThan(0);
+    expect(KEYWORD_WEIGHT).toBeLessThanOrEqual(0.8);
   });
 
   it("stays below the weight where long-tail retrieval collapses", () => {

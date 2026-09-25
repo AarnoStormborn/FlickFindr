@@ -49,6 +49,15 @@ async function main(): Promise<void> {
     // those rows match an `under N minutes` filter. Same contract as
     // trailer_checked / providers_checked: failure is not recorded as data.
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS runtime_checked BOOLEAN NOT NULL DEFAULT false");
+    // TMDB keyword names, comma-joined, plus the "we asked" flag. Keywords carry
+    // the premise that TMDB's short overview deliberately withholds ("iceberg",
+    // "ghost"), so they are what make some queries retrievable at all.
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS keywords TEXT");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS keywords_checked BOOLEAN NOT NULL DEFAULT false");
+    // A second vector, searched alongside plot_embedding and combined at query
+    // time. Kept separate because blending keywords *into* the plot document
+    // displaces it: measured, that gained six queries and lost six.
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS keywords_embedding vector(384)");
     // Plain unique index (NULLs allowed — they are distinct), so
     // ON CONFLICT (tmdb_id) resolves. Replaces any older partial index.
     await pool.query("DROP INDEX IF EXISTS idx_movies_tmdb_id");
