@@ -4,7 +4,7 @@ import { formatRuntime } from '../lib/format';
 import { useListsContext } from '../context/useListsContext';
 import './MovieCard.css';
 
-export default function MovieCard({ movie }) {
+export default function MovieCard({ movie, matchLabel = null }) {
     const navigate = useNavigate();
     const listsApi = useListsContext();
     const {
@@ -48,6 +48,15 @@ export default function MovieCard({ movie }) {
                 {/* Release Year Badge */}
                 {movie.release_year && (
                     <div className="movie-card-year">{movie.release_year}</div>
+                )}
+
+                {/* Why this result is here, for plot-based searches. The label is
+                    relative to the other results, which is the only honest way to
+                    read a cosine similarity across different queries. */}
+                {matchLabel && (
+                    <div className="movie-card-match" title={matchLabel.title}>
+                        {matchLabel.text}
+                    </div>
                 )}
 
                 {/* Save-to-list (icon) — uses app-level lists store */}
