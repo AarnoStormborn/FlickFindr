@@ -216,6 +216,15 @@ npm run backfill:providers -- --all         # whole catalogue
   a caller asks (`attempts`), so request-time paths keep their single-shot
   behaviour while batch jobs retry: without that, one connection reset was recorded
   as "TMDB has no keywords for this film" — 13 of the first 20 films failed.
+- **Embedding configuration is explicit, and pooling is not cosmetic.** The model
+  (`EMBEDDING_MODEL`, default `Xenova/all-MiniLM-L6-v2`), its query/passage prefixes
+  and its pooling (`EMBEDDING_POOLING`, mean for MiniLM, cls for BGE) all come from
+  the environment so a candidate can be A/B tested. Two traps: the dimension must
+  stay 384, or both `vector(384)` columns and every row need changing; and using the
+  wrong pooling for a model quietly degrades every result, which makes a comparison
+  measure the mistake instead of the model. Prefixes are applied by role —
+  `generateEmbedding` is the query path, `batchGenerateEmbeddings` is the document
+  path — so swapping them silently degrades search.
 - **Ranking relevance is measured, not eyeballed.** `npm run eval:relevance` scores
   plot search against `scripts/relevance-queries.ts` (hits@10, MRR, plus mean votes
   and distinct top-1s to catch a ranker that has stopped reading the query). Run it

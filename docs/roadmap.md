@@ -232,12 +232,27 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   **0.5 → 25/43 (58.1%) / MRR 0.298**, 0.6 → 26/43 / 0.296, 1.0 → 24/43.
   At 0.5 three queries are gained and none lost, including the iceberg query that
   previously could not be answered at all.
-- **Still open: the embedding model.** 384-dim MiniLM over a short document cannot
-  separate films with similar plots, and some queries still fail because the
-  keywords do not carry the premise either (The Sixth Sense's do not include
-  "sees dead people"). A stronger 384-dim model is a drop-in (the column is
-  `vector(384)`) but needs a full re-embed of 30,749 films and a second column to
-  match; judge it with the same eval set.
+- **The embedding model: measured, and deferred on evidence.** MiniLM was compared
+  against `bge-small-en-v1.5` (the strongest 384-dim alternative) on the ranking that
+  the keyword vector exists to fix. Each model was used with its own correct pooling
+  (MiniLM mean, BGE CLS — using the wrong one measures the mistake, not the model),
+  and MiniLM ranked the target film **first** where BGE put it **second**, behind a
+  decoy. BGE's similarities also sit much higher across the board, which would
+  invalidate both tuned weights (keyword and prominence) and mean re-tuning them
+  from scratch. With the remaining failures being *text* gaps rather than model gaps
+  — The Sixth Sense's keywords do not contain "sees dead people" either — a swap is
+  not the next win. The configuration is now explicit
+  (`EMBEDDING_MODEL`, `EMBEDDING_QUERY_PREFIX`, `EMBEDDING_PASSAGE_PREFIX`,
+  `EMBEDDING_POOLING`) so a future candidate is a measurement rather than a rewrite.
+  The dimension must stay 384 or both columns need a schema change.
+- **Explainable plot results — *shipped*.** Plot search showed no reason for its
+  ordering. Each result now carries a plain-language label ("Closest match", "Strong
+  match", "Related match", "Loose match") and the results header states the rule:
+  ranked by how closely the plot matches, then by how well known the film is. The
+  raw cosine is deliberately **not** shown as a percentage — a good MiniLM plot
+  match scores ~0.4-0.5, so "45%" would read as a failure — and the label is
+  expressed relative to the closest result on the page and says so, because
+  embedding similarities are not comparable between queries.
 - Also still worth doing: showing *why* a result matched (matched plot snippet +
   similarity), which builds trust in the differentiator.
 
