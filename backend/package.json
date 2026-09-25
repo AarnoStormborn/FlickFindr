@@ -19,7 +19,8 @@
     "backfill:languages": "tsx scripts/backfill-languages.ts",
     "backfill:providers": "tsx scripts/backfill-providers.ts",
     "test:coverage": "vitest run --coverage",
-    "eval:relevance": "tsx scripts/eval-relevance.ts"
+    "eval:relevance": "tsx scripts/eval-relevance.ts",
+    "backfill:keywords": "tsx scripts/backfill-keywords.ts"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.84.3",

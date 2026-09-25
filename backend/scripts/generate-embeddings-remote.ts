@@ -11,18 +11,40 @@
 
 import { getPool, closePool } from "../src/db/pool.js";
 import { batchGenerateEmbeddings, EMBEDDING_DIM } from "../src/embedding.js";
+import { keywordText, plotText } from "../src/services/embeddingText.js";
 import { logger } from "../src/logger.js";
 
 const BATCH_SIZE = 32; // model batch
 const COMMIT_EVERY = 500; // rows per transaction
 
+function arg(name: string): string | undefined {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
+/**
+ * A full re-embed, for when the embedded document itself changes (keywords,
+ * title, genre). Without `--all` this only fills gaps, which is the normal case.
+ *
+ * Resuming a long re-embed: progress is logged with the last id written, so pass
+ * `--from-id` to continue rather than starting over.
+ */
+const ALL = process.argv.includes("--all");
+const FROM_ID = Number(arg("from-id") ?? 0);
+
 async function main(): Promise<void> {
   const pool = getPool();
+  // The document is built by embeddingText(), shared with the local generator so
+  // the two can never disagree about what a vector means.
+  const columns = "id, movie_name, release_year, genre, keywords, plot";
+  const conditions = ["id >= $1"];
+  if (!ALL) conditions.push("plot_embedding IS NULL");
   const { rows } = await pool.query(
-    "SELECT id, plot FROM movies WHERE plot IS NOT NULL AND plot != '' AND plot_embedding IS NULL ORDER BY id",
+    `SELECT ${columns} FROM movies WHERE ${conditions.join(" AND ")} ORDER BY id`,
+    [FROM_ID],
   );
   const total = rows.length;
-  logger.info({ rows: total }, "Plots needing embeddings");
+  logger.info({ rows: total, all: ALL, fromId: FROM_ID }, "Films needing embeddings");
 
   if (total === 0) {
     logger.info("Nothing to embed.");
@@ -35,22 +57,28 @@ async function main(): Promise<void> {
   try {
     for (let i = 0; i < total; i += BATCH_SIZE) {
       const chunk = rows.slice(i, i + BATCH_SIZE);
-      const texts = chunk.map((r) => String(r.plot ?? ""));
-      const vectors = await batchGenerateEmbeddings(texts, BATCH_SIZE);
+      // Two documents per film, two columns (see src/services/embeddingText.ts).
+      const plotTexts = chunk.map((r) => plotText(r));
+      const keywordTexts = chunk.map((r) => keywordText(r));
+      const vectors = await batchGenerateEmbeddings(plotTexts, BATCH_SIZE);
+      const keywordVectors = await batchGenerateEmbeddings(keywordTexts, BATCH_SIZE);
 
       await client.query("BEGIN");
       for (let k = 0; k < chunk.length; k++) {
         const id = Number(chunk[k]!.id);
         const vec = `[${(vectors[k] ?? []).join(",")}]`;
+        // NULL (not a zero vector) when there is no keyword document at all.
+        const kwVec = keywordTexts[k] ? `[${(keywordVectors[k] ?? []).join(",")}]` : null;
         await client.query(
-          "UPDATE movies SET plot_embedding = $1::vector WHERE id = $2",
-          [vec, id],
+          "UPDATE movies SET plot_embedding = $1::vector, keywords_embedding = $2::vector WHERE id = $3",
+          [vec, kwVec, id],
         );
       }
       await client.query("COMMIT");
       done += chunk.length;
       if (done % COMMIT_EVERY === 0 || done === total) {
-        logger.info({ done, total }, `Embedded ${done}/${total}`);
+        const lastId = Number(chunk[chunk.length - 1]?.id ?? 0);
+        logger.info({ done, total, lastId }, `Embedded ${done}/${total} (resume with --from-id ${lastId + 1})`);
       }
     }
     logger.info({ updated: done, dim: EMBEDDING_DIM }, "Embeddings stored");

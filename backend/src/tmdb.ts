@@ -72,20 +72,63 @@ export function trailerScore(v: RankableVideo): number {
   return score;
 }
 
-async function tmdbGet<T>(path: string, params: Record<string, string>): Promise<T | null> {
+/**
+ * One TMDB GET with optional retries.
+ *
+ * `attempts` defaults to 1 so request-time callers keep today's single-shot
+ * behaviour (a user waiting on a trailer should not make three round trips).
+ * Batch jobs pass more: without retries a single connection reset or a 429 is
+ * recorded as "TMDB has nothing for this film", which is wrong and permanent.
+ * Backoff is short because these failures are mostly network resets, not
+ * throttling.
+ */
+async function tmdbGet<T>(path: string, params: Record<string, string>, attempts = 1): Promise<T | null> {
   const key = API_KEY();
   if (!key) return null;
   const url = new URL(`${BASE}${path}`);
   url.searchParams.set("api_key", key);
   url.searchParams.set("language", "en-US");
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null; // network error
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (res.ok) return (await res.json()) as T;
+      // A 404 means the film is gone; anything else (429, 5xx) is worth another go.
+      if (res.status !== 429 && res.status < 500) return null;
+    } catch {
+      /* network error — fall through to the retry */
+    }
+    if (attempt < attempts) await new Promise((r) => setTimeout(r, 400 * attempt));
   }
+  return null;
+}
+
+/**
+ * TMDB keyword names for a film, comma-joined.
+ *
+ * These matter because TMDB's overview is a spoiler-free marketing blurb: The
+ * Sixth Sense never mentions that the boy sees dead people, and Titanic never
+ * says "iceberg". Keywords carry that vocabulary, and they are what the plot
+ * vector is missing for whole classes of query.
+ *
+ * Returns { ok, keywords }: ok=false means TMDB was unreachable, so callers must
+ * not record the film as checked (same contract as trailers and providers).
+ */
+export async function getKeywords(
+  tmdbId: number,
+  attempts = 1,
+): Promise<{ ok: boolean; keywords: string[] }> {
+  const data = await tmdbGet<{ keywords?: { id?: number; name?: string }[] }>(
+    `/movie/${tmdbId}/keywords`,
+    {},
+    attempts,
+  );
+  if (data === null) return { ok: false, keywords: [] };
+  const names = (data.keywords ?? [])
+    .map((k) => String(k.name ?? "").trim())
+    .filter(Boolean);
+  return { ok: true, keywords: names };
 }
 
 /**

@@ -63,21 +63,39 @@ No `.env` is required at boot — config ships dev defaults matching
 | `npm run embeddings` | batch plot embeddings → plot_embedding |
 | `npm run backfill:languages` | fill `original_language` from TMDB (resumable; `-- --fill` for the per-movie remainder) |
 | `npm run backfill:providers` | fill `watch_providers` (India + US) from TMDB; `-- --limit N` or `--all` |
+| `npm run backfill:keywords` | fill `keywords` (TMDB keyword names, used for the second search vector); resumable, `-- --limit N` or `-- --concurrency N` |
+| `npm run embeddings:remote` | embed for a remote DB in committed batches; `-- --all` to re-embed everything, `-- --from-id N` to resume |
 | `npm run check` | env/catalog/agent health report |
 | `npm run eval:relevance` | score describe-the-plot search against `scripts/relevance-queries.ts` (hits@10 + MRR + long-tail diagnostics); `-- --via-agent` to mirror the live LLM-rewrite path, `--json` for machine output |
 
 ### Relevance tuning
 
-Plot search ranks by `similarity + SEMANTIC_VOTE_WEIGHT * log-scaled votes`, and
-`SEMANTIC_VOTE_WEIGHT` (default `0.12`, in `src/services/semantic.ts`) is meant to
-be swept rather than guessed at:
+Plot search ranks by two cosines plus a prominence term:
+
+```
+plot similarity  +  SEMANTIC_KEYWORD_WEIGHT * keyword similarity  +  SEMANTIC_VOTE_WEIGHT * log-scaled votes
+```
+
+The two vectors exist because TMDB overviews withhold the premise (Titanic's never
+says "iceberg"), so `keywords_embedding` holds `title + genres + keywords`. They are
+kept as separate columns on purpose: blending them into one document was measured
+and is a wash at best. Both weights are meant to be swept rather than guessed at:
 
 ```bash
 cd backend
+for w in 0 0.25 0.4 0.5 0.6 1.0; do
+  echo -n "kw=$w  "; SEMANTIC_KEYWORD_WEIGHT=$w npm run eval:relevance | grep -E "hits@10|MRR" | tr '\n' ' '; echo
+done
 for w in 0 0.08 0.12 0.2; do
-  echo -n "W=$w  "; SEMANTIC_VOTE_WEIGHT=$w npm run eval:relevance | grep -E "hits@10|MRR" | tr '\n' ' '; echo
+  echo -n "votes=$w  "; SEMANTIC_VOTE_WEIGHT=$w npm run eval:relevance | grep -E "hits@10|MRR" | tr '\n' ' '; echo
 done
 ```
+
+Changing *what* a vector contains means re-embedding: `npm run embeddings` locally
+(~7 minutes for both columns) and `npm run embeddings:remote -- --all` for
+production. Change `src/services/embeddingText.ts`, not the scripts — both
+generators use it precisely so local and production cannot disagree about what a
+vector means.
 
 The eval set deliberately contains films with a few hundred votes whose plots are
 unmistakable. They are the guard against a prior that is too strong: at 0.12 the
