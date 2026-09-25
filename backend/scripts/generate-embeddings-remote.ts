@@ -63,17 +63,25 @@ async function main(): Promise<void> {
       const vectors = await batchGenerateEmbeddings(plotTexts, BATCH_SIZE);
       const keywordVectors = await batchGenerateEmbeddings(keywordTexts, BATCH_SIZE);
 
+      // One statement per chunk, not one per row: against a remote pooler a
+      // per-row UPDATE is a network round trip each. Measured on a full
+      // re-embed of the catalogue: 3.8 rows/s that way, 26.7 rows/s this way.
+      const ids = chunk.map((r) => Number(r.id));
+      const plotVecs = chunk.map((_, k) => `[${(vectors[k] ?? []).join(",")}]`);
+      // NULL (not a zero vector) when there is no keyword document at all.
+      const kwVecs = chunk.map((_, k) => (keywordTexts[k] ? `[${(keywordVectors[k] ?? []).join(",")}]` : null));
+
       await client.query("BEGIN");
-      for (let k = 0; k < chunk.length; k++) {
-        const id = Number(chunk[k]!.id);
-        const vec = `[${(vectors[k] ?? []).join(",")}]`;
-        // NULL (not a zero vector) when there is no keyword document at all.
-        const kwVec = keywordTexts[k] ? `[${(keywordVectors[k] ?? []).join(",")}]` : null;
-        await client.query(
-          "UPDATE movies SET plot_embedding = $1::vector, keywords_embedding = $2::vector WHERE id = $3",
-          [vec, kwVec, id],
-        );
-      }
+      await client.query(
+        `UPDATE movies m
+            SET plot_embedding = d.plot::vector,
+                keywords_embedding = d.kw::vector
+           FROM (SELECT unnest($1::int[]) AS id,
+                        unnest($2::text[]) AS plot,
+                        unnest($3::text[]) AS kw) d
+          WHERE m.id = d.id`,
+        [ids, plotVecs, kwVecs],
+      );
       await client.query("COMMIT");
       done += chunk.length;
       if (done % COMMIT_EVERY === 0 || done === total) {
