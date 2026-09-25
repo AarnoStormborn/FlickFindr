@@ -12,11 +12,13 @@ import { AGENT_DIR, getModelRuntime, resolveAgentModel } from "./runtime.js";
 const PARSE_CACHE_TTL_MS = 30 * 60 * 1000; // 30 min
 const parseCache = new Map<string, { value: HybridSearchRequest; ts: number }>();
 
-const PARSE_PROMPT = `You are a movie-catalog query parser. Convert the user's natural-language
-movie search request into a single JSON object with ONLY these fields (omit any that are unknown):
+const PARSE_PROMPT = `You are a movie-catalog search assistant. Rewrite the user's request into the words a
+film's plot summary would use, and extract any explicit filters.
+
+Respond with a single JSON object with ONLY these fields (omit any that are unknown):
 
 {
-  "query": string,        // the core search intent (what kind of movie they want)
+  "query": string,        // the plot described in concrete terms, matched against plot text
   "genre": string | null,      // genre name if clearly stated
   "directors": string | null,  // director name if clearly stated
   "stars": string | null,      // actor name if clearly stated
@@ -28,9 +30,18 @@ movie search request into a single JSON object with ONLY these fields (omit any 
   "sort_order": "asc" | "desc" | null
 }
 
-Rules:
-- "query" must be short (5-15 words) and capture the plot/theme intent, e.g. "prison escape and friendship".
-- Do not include genre/rating words inside "query" if they are already extracted as filters.
+Rules for "query" — it is embedded and matched against plot summaries, so the
+concrete words are the whole point:
+- KEEP the specific details: places, objects, jobs, relationships, time periods.
+  "a suicidal woman is talked down by a knife thrower on a Paris bridge" is a good
+  query; "despair and hope" is a useless one. Never trade detail for a theme.
+- Describe the story itself, not its genre, mood or quality.
+- Expand shorthand into what it stands for ("HP" -> "Harry Potter"; "the spinning
+  top film" -> dreams within dreams). Do not invent details the user did not imply.
+- 8-25 words is fine. Length is not a problem; losing a distinctive detail is.
+- Do not repeat genre or rating words that are already extracted as filters.
+
+Rules for the other fields:
 - Extract genre / director / actor names EXACTLY as the user phrased them (verbatim substrings).
   Do not invent names, do not add or remove spaces or commas, and output null when uncertain.
 - Respond with the JSON object only. No markdown fences, no prose.`;

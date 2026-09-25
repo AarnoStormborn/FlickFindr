@@ -190,20 +190,40 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   rank 7th at 0.12, slips to 9th at 0.2, and leaves the top ten at 0.25. Two other
   long-tail guards are too obscure for the retriever at *every* weight, so they are
   recorded as known misses rather than blamed on the prior.
-- **The LLM rewrite is currently a slight drag, and is the next lever.**
-  `/search/semantic` embeds the agent's rewrite rather than what the user typed,
-  which measured *worse* than the raw query at every weight (14 vs 15 unweighted)
-  and costs precision on distinctive queries: "a suicidal woman is saved on a
-  Paris bridge by a knife thrower" becomes "suicidal woman saved by knife thrower
-  who makes her his target", dropping the location, and the intended film leaves
-  the top ten at **any** weight. The rewrite prompt is the cheapest remaining win,
-  and the eval set can measure it.
-- **Still open: retrieval quality.** The embeddings are 384-dim MiniLM over plot
-  text alone — no title, genre or year — so films with similar plots cannot be
-  separated, and some canonical answers never surface at all ("gruesome murders in
-  a rainy city" retrieves Se7en only via the rewrite). Next steps, both needing a
-  full re-embed and both judgeable by the same eval set: embed a richer document
-  (title + year + genres + plot), and/or swap to a stronger 384-dim model.
+- **The LLM rewrite is now tuned; the remaining failures are the source text.**
+  `/search/semantic` embeds the agent's rewrite rather than the user's words. The
+  prompt used to demand a *theme* — "query must be short (5-15 words) and capture
+  the plot/theme intent, e.g. 'prison escape and friendship'" — which stripped
+  exactly the words that make a film findable: "a suicidal woman is saved on a
+  **Paris bridge** by a knife thrower" became "suicidal woman saved by knife
+  thrower". Rewriting now has to keep concrete detail and expand references
+  instead of abstracting:
+
+  | | hits@10 (43 queries) | MRR | rewrites identical to input |
+  |---|---|---|---|
+  | old prompt | 20/43 (46.5%) | 0.276 | 6/38 |
+  | **new prompt** | **23/43 (53.5%)** | 0.301 | 30/38 |
+  | no rewrite at all | 22/43 (51.2%) | 0.301 | — |
+
+  It also recovered the 237-vote guard film, which the old prompt pushed out of the
+  top ten at *every* weight. The eval set gained a colloquial section to test
+  whether the agent earns its latency: on indirect references it does — "the
+  spinning top dream movie" now finds Inception, which raw embedding cannot.
+- **Next retrieval step: enrich the embedded document.** Two of the three remaining
+  colloquial failures cannot be fixed with the current text, because the embedded
+  document is TMDB's short marketing overview, which withholds the premise by
+  design. The Sixth Sense's reads "meets a nine year old boy… who is hiding a dark
+  secret" (never mentions seeing the dead); Titanic's never contains the word
+  "iceberg" ("through to its death—on its first and last voyage"). Both rewrites
+  were perfect and still could not match. Adding TMDB keywords — one
+  `/movie/{id}/keywords` call per film, the same shape as the trailer and provider
+  backfills — to make the embedded text `title + year + genres + keywords +
+  overview` is the highest-value retrieval change left, and the eval set scores it.
+- **Still open: the embedding model.** 384-dim MiniLM over a short document cannot
+  separate films with similar plots. A stronger 384-dim model is a drop-in (the
+  column is `vector(384)`) but needs a full re-embed of 30,749 films, and is worth
+  judging only after the document is richer — a better model on a premise-free
+  blurb is not obviously a win.
 - Also still worth doing: showing *why* a result matched (matched plot snippet +
   similarity), which builds trust in the differentiator.
 
