@@ -25,6 +25,7 @@
 import { getPool, closePool } from "../src/db/pool.js";
 import { logger } from "../src/logger.js";
 import { configuredRegions, getWatchProviders } from "../src/tmdb.js";
+import type { RegionProviders } from "../src/tmdb.js";
 import { WEIGHTED_RATING_SQL } from "../src/services/rating.js";
 
 const args = process.argv.slice(2);
@@ -36,8 +37,14 @@ const LIMIT = ALL
     ? Number(args[limitArg + 1])
     : Number(process.env.PROVIDER_BACKFILL_LIMIT ?? 1000);
 const BATCH = 200;
-/** Polite pause between TMDB calls (the client also backs off on failures). */
-const DELAY_MS = Number(process.env.TMDB_REQUEST_DELAY_MS ?? 150);
+/**
+ * Films fetched at once. Sequential fetching with a 150ms courtesy pause ran at
+ * ~2 films/s, which is hours for the catalogue; TMDB tolerates far more, and the
+ * measured keyword backfill sustained 23/s on the same client.
+ */
+const CONCURRENCY = Number(process.env.PROVIDER_CONCURRENCY ?? 8);
+/** Optional pause between batches, for rate-limit paranoia. */
+const DELAY_MS = Number(process.env.TMDB_REQUEST_DELAY_MS ?? 0);
 /** Abort if TMDB seems down rather than grinding through the whole queue. */
 const MAX_CONSECUTIVE_FAILURES = 10;
 
@@ -70,11 +77,9 @@ async function main(): Promise<void> {
   while (!stop && checked < LIMIT) {
     const remaining = ALL ? BATCH : Math.min(BATCH, LIMIT - checked);
     const { rows } = await pool.query(
-      // Highest-rated first: the app browses by rating, so this is the order in
-      // which films are actually opened. `id` breaks ties so batches cannot
-      // repeat or skip rows.
-      // Vote-weighted, matching how the app itself ranks: the raw rating would
-      // spend the first batches on 9.9-rated films with three-figure vote counts.
+      // Vote-weighted, matching how the app itself ranks, so a partial run has
+      // covered the films people actually open. `id` breaks ties so batches
+      // cannot repeat or skip rows.
       `SELECT id, tmdb_id FROM movies
         WHERE providers_checked = false AND tmdb_id IS NOT NULL
         ORDER BY ${WEIGHTED_RATING_SQL} DESC NULLS LAST, id ASC
@@ -83,45 +88,61 @@ async function main(): Promise<void> {
     );
     if (rows.length === 0) break;
 
-    for (const row of rows) {
-      const movieId = Number(row.id);
-      const tmdbId = Number(row.tmdb_id);
-      const { ok, regions: found } = await getWatchProviders(tmdbId);
-
-      if (!ok) {
-        // Leave providers_checked = false so this film is retried later. A
-        // failed lookup must never be recorded as "nothing available".
-        failed += 1;
-        consecutiveFailures += 1;
-        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-          logger.error(
-            { consecutiveFailures, checked },
-            "TMDB is failing repeatedly; stopping so the remainder is retried later",
-          );
-          stop = true;
-          break;
+    // Fetched concurrently, then written in one statement. Both halves matter:
+    // sequentially this ran at ~2 films/s, and a per-film UPDATE against the
+    // pooler is a round trip each (the same lesson as the embedding backfill and
+    // the keyword backfill).
+    const queue = [...rows];
+    const fetched: { id: number; found: RegionProviders[] }[] = [];
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        if (stop) return;
+        const row = queue.shift();
+        if (!row) return;
+        const { ok, regions: found } = await getWatchProviders(Number(row.tmdb_id), 4);
+        if (!ok) {
+          // Leave providers_checked = false so this film is retried later. A
+          // failed lookup must never be recorded as "nothing available".
+          failed += 1;
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            logger.error(
+              { consecutiveFailures, checked },
+              "TMDB is failing repeatedly; stopping so the remainder is retried later",
+            );
+            stop = true;
+            return;
+          }
+          continue;
         }
-        continue;
+        consecutiveFailures = 0;
+        fetched.push({ id: Number(row.id), found });
+        checked += 1;
+        if (found.length) withOffers += 1;
+        else withoutOffers += 1;
       }
-      consecutiveFailures = 0;
+    };
+    await Promise.all(Array.from({ length: Math.max(1, CONCURRENCY) }, worker));
 
+    if (fetched.length) {
       await pool.query(
-        "UPDATE movies SET watch_providers = $1, providers_checked = true, providers_updated_at = now() WHERE id = $2",
-        [JSON.stringify(found), movieId],
+        `UPDATE movies m
+            SET watch_providers = d.wp::jsonb,
+                providers_checked = true,
+                providers_updated_at = now()
+           FROM (SELECT unnest($1::int[]) AS id, unnest($2::text[]) AS wp) d
+          WHERE m.id = d.id`,
+        [fetched.map((f) => f.id), fetched.map((f) => JSON.stringify(f.found))],
       );
-      checked += 1;
-      if (found.length) withOffers += 1;
-      else withoutOffers += 1;
-      if (checked % 100 === 0) logger.info({ checked, withOffers, withoutOffers, failed }, "progress");
-
-      await sleep(DELAY_MS);
     }
+    logger.info({ checked, withOffers, withoutOffers, failed }, "progress");
+    if (DELAY_MS > 0) await sleep(DELAY_MS);
   }
 
-  const pendingRes = await pool.query(
+  const { rows: remainingRows } = await pool.query(
     "SELECT count(*)::int AS n FROM movies WHERE providers_checked = false AND tmdb_id IS NOT NULL",
   );
-  const stillPending = Number((pendingRes.rows[0] as { n?: number } | undefined)?.n ?? 0);
+  const stillPending = remainingRows[0]?.n ?? 0;
 
   logger.info(
     {
