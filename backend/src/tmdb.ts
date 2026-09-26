@@ -263,12 +263,16 @@ export function normalizeWatchProviders(
  * `ok: false` means TMDB was unreachable and the caller must NOT record the
  * result as "nothing available" — same contract as getMovieVideos.
  */
-export async function getWatchProviders(tmdbId: number): Promise<ProvidersLookup> {
+export async function getWatchProviders(tmdbId: number, attempts = 1): Promise<ProvidersLookup> {
   const cacheKey = `providers:${tmdbId}`;
   const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.value as ProvidersLookup;
 
-  const data = await tmdbGet<{ results?: Record<string, RawRegion> }>(`/movie/${tmdbId}/watch/providers`, {});
+  const data = await tmdbGet<{ results?: Record<string, RawRegion> }>(
+    `/movie/${tmdbId}/watch/providers`,
+    {},
+    attempts,
+  );
   if (data === null) return { ok: false, regions: [] };
 
   const value: ProvidersLookup = { ok: true, regions: normalizeWatchProviders(data.results) };

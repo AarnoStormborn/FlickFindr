@@ -260,6 +260,27 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   match scores ~0.4-0.5, so "45%" would read as a failure — and the label is
   expressed relative to the closest result on the page and says so, because
   embedding similarities are not comparable between queries.
+- **Where the remaining misses come from — diagnosed, not guessed.** Ranking each
+  failing target by each vector separately shows three distinct causes, and only one
+  of them is the model:
+
+  | film | plot rank | keyword rank | combined | cause |
+  |---|---|---|---|---|
+  | Titanic | 370 | 5 | 5 | keyword vector working as intended |
+  | Primer | 1173 | 23 | 108 | **a linear sum dilutes a strong single-vector match** |
+  | The Red Virgin | 669 | 5821 | 921 | **junk keywords (two generic terms) make it worse than plot alone** |
+  | The Sixth Sense | 1794 | 58 | 64 | vocabulary is present (`ghost`, `ghost child`, `afterlife`) — a model limit |
+  | Man from Snowy River | 93 | 14 | 17 | near-miss; no single cause |
+  | Highlander | 6 | 529 | 8 | plot alone would be 6th; the vote weight costs it |
+
+  So the next lever is **fusion, not more data**: reciprocal-rank fusion (or per-query
+  normalisation of the two cosines) fixes dilution and stops a weak keyword list from
+  costing anything, because a film ranked 23rd by keywords keeps that signal however
+  badly it ranks by plot. The catch is that RRF scores are ~0.01-0.02 rather than
+  ~0.5, so the prominence weight has to be re-derived, and it needs a second sort of
+  the catalogue per query — a real latency cost on a free tier. Worth doing, but it
+  is a measured project rather than a tweak, and the harness is what makes it one.
+
 - Also still worth doing: showing *why* a result matched (matched plot snippet +
   similarity), which builds trust in the differentiator.
 
