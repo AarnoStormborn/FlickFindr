@@ -145,20 +145,31 @@ describe("getMovieVideos", () => {
 
   it("reports ok=false and caches nothing when TMDB is unreachable", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("boom"); }));
-    expect(await getMovieVideos(42)).toEqual({ ok: false, videos: [] });
+    expect(await getMovieVideos(42)).toEqual({ ok: false, missing: false, videos: [] });
     // A later success must not be masked by the failure.
     vi.stubGlobal("fetch", fetchMock([video({ key: "good" })]));
     expect((await getMovieVideos(42)).videos.map((v) => v.key)).toEqual(["good"]);
   });
 
-  it("reports ok=false on an HTTP error instead of crashing", async () => {
+  it("reports ok=false on a retryable HTTP error instead of crashing", async () => {
     vi.stubGlobal("fetch", fetchMock([], false, 429));
-    expect(await getMovieVideos(42)).toEqual({ ok: false, videos: [] });
+    expect(await getMovieVideos(42)).toEqual({ ok: false, missing: false, videos: [] });
+  });
+
+  it("distinguishes a 404 — a film TMDB does not have — from a failure", async () => {
+    // The distinction is the whole point: a 404 is an answer, so the backfills may
+    // record "we asked, there is nothing" instead of retrying the film forever.
+    // A fresh id, and a direct mock: the shared helper asserts the URL, and 42 is
+    // already cached by the tests above.
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })));
+    const res = await getMovieVideos(777001);
+    expect(res.ok).toBe(false);
+    expect(res.missing).toBe(true);
   });
 
   it("returns an empty list (ok=true) when no trailer exists", async () => {
     vi.stubGlobal("fetch", fetchMock([]));
-    expect(await getMovieVideos(42)).toEqual({ ok: true, videos: [] });
+    expect(await getMovieVideos(42)).toEqual({ ok: true, missing: false, videos: [] });
   });
 
   it("caches successful lookups per movie id", async () => {
@@ -175,7 +186,7 @@ describe("getMovieVideos", () => {
     vi.stubEnv("TMDB_API_KEY", "");
     const fetchFn = vi.fn();
     vi.stubGlobal("fetch", fetchFn);
-    expect(await getMovieVideos(42)).toEqual({ ok: false, videos: [] });
+    expect(await getMovieVideos(42)).toEqual({ ok: false, missing: false, videos: [] });
     expect(fetchFn).not.toHaveBeenCalled();
   });
 });

@@ -162,7 +162,7 @@ describe("GET /flicks/movie/:id/providers", () => {
     // The important one: a failed lookup must not be stored as "no providers",
     // which would be a permanent lie. providers_checked stays false so a later
     // visit retries.
-    vi.mocked(getWatchProviders).mockResolvedValue({ ok: false, regions: [] });
+    vi.mocked(getWatchProviders).mockResolvedValue({ ok: false, missing: false, regions: [] });
     const { app, updates } = build({ tmdb_id: 27205, providers_checked: false, watch_providers: null });
     await app.ready();
     const res = await app.inject({ method: "GET", url: "/flicks/movie/1/providers" });
@@ -175,6 +175,7 @@ describe("GET /flicks/movie/:id/providers", () => {
   it("fetches once on first visit and persists the answer", async () => {
     vi.mocked(getWatchProviders).mockResolvedValue({
       ok: true,
+      missing: false,
       regions: [{ code: "US", link: "l-us", flatrate: [{ id: 9, name: "ViX", logo: "u" }], rent: [], buy: [] }],
     });
     const { app, updates } = build({ tmdb_id: 27205, providers_checked: false, watch_providers: null });
@@ -192,7 +193,7 @@ describe("GET /flicks/movie/:id/providers", () => {
   });
 
   it("persists an empty answer as genuinely 'nothing available'", async () => {
-    vi.mocked(getWatchProviders).mockResolvedValue({ ok: true, regions: [] });
+    vi.mocked(getWatchProviders).mockResolvedValue({ ok: true, missing: false, regions: [] });
     const { app, updates } = build({ tmdb_id: 999, providers_checked: false, watch_providers: null });
     await app.ready();
     const res = await app.inject({ method: "GET", url: "/flicks/movie/1/providers" });

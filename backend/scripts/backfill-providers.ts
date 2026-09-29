@@ -104,6 +104,7 @@ async function main(): Promise<void> {
   let withOffers = 0;
   let withoutOffers = 0;
   let failed = 0;
+  let missingFromTmdb = 0;
   let consecutiveFailures = 0;
   let stop = false;
 
@@ -138,13 +139,21 @@ async function main(): Promise<void> {
     // the keyword backfill).
     const queue = [...rows];
     const fetched: { id: number; found: RegionProviders[] }[] = [];
+    // Films TMDB says do not exist: recorded as checked with nothing rather than
+    // retried on every future run.
+    const gone: number[] = [];
     const worker = async (): Promise<void> => {
       for (;;) {
         if (stop) return;
         const row = queue.shift();
         if (!row) return;
-        const { ok, regions: found } = await getWatchProviders(Number(row.tmdb_id), 4);
+        const { ok, missing, regions: found } = await getWatchProviders(Number(row.tmdb_id), 4);
         if (!ok) {
+          if (missing) {
+            gone.push(Number(row.id));
+            missingFromTmdb += 1;
+            continue;
+          }
           // Leave providers_checked = false so this film is retried later. A
           // failed lookup must never be recorded as "nothing available".
           failed += 1;
@@ -168,6 +177,16 @@ async function main(): Promise<void> {
     };
     await Promise.all(Array.from({ length: Math.max(1, CONCURRENCY) }, worker));
 
+    if (gone.length) {
+      await pool.query(
+        `UPDATE movies
+            SET watch_providers = '[]'::jsonb,
+                providers_checked = true,
+                providers_updated_at = now()
+          WHERE id = ANY($1::int[])`,
+        [gone],
+      );
+    }
     if (fetched.length) {
       await pool.query(
         `UPDATE movies m
@@ -179,7 +198,7 @@ async function main(): Promise<void> {
         [fetched.map((f) => f.id), fetched.map((f) => JSON.stringify(f.found))],
       );
     }
-    logger.info({ checked, withOffers, withoutOffers, failed }, "progress");
+    logger.info({ checked, withOffers, withoutOffers, failed, missingFromTmdb }, "progress");
     if (DELAY_MS > 0) await sleep(DELAY_MS);
   }
 
@@ -195,6 +214,7 @@ async function main(): Promise<void> {
       withOffers,
       withoutOffers,
       failed,
+      missingFromTmdb,
       stillPending,
       elapsedNote: failed ? "failed films stay unchecked and will be retried on the next run" : undefined,
     },

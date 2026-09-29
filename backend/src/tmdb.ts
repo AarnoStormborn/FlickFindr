@@ -19,6 +19,8 @@ export interface TmdbVideo {
 }
 
 export interface TrailerLookup {
+  /** True when TMDB says the film does not exist, so retrying can never help. */
+  missing: boolean;
   ok: boolean; // true = TMDB responded (videos may still be empty)
   videos: TmdbVideo[];
 }
@@ -82,9 +84,24 @@ export function trailerScore(v: RankableVideo): number {
  * Backoff is short because these failures are mostly network resets, not
  * throttling.
  */
-async function tmdbGet<T>(path: string, params: Record<string, string>, attempts = 1): Promise<T | null> {
+/**
+ * A TMDB response, or the reason there isn't one.
+ *
+ * The status matters because a 404 is an *answer* — the film does not exist on
+ * TMDB — while a null status is a transient failure. Callers that record "we asked
+ * and there was nothing" (the provider and keyword backfills) need to tell them
+ * apart: treating a 404 as transient meant two deleted films sat unchecked forever,
+ * re-fetched on every refresh.
+ */
+export interface TmdbResponse<T> {
+  data: T | null;
+  /** HTTP status, or null when the request never completed. */
+  status: number | null;
+}
+
+async function tmdbGet<T>(path: string, params: Record<string, string>, attempts = 1): Promise<TmdbResponse<T>> {
   const key = API_KEY();
-  if (!key) return null;
+  if (!key) return { data: null, status: null };
   const url = new URL(`${BASE}${path}`);
   url.searchParams.set("api_key", key);
   url.searchParams.set("language", "en-US");
@@ -93,15 +110,16 @@ async function tmdbGet<T>(path: string, params: Record<string, string>, attempts
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-      if (res.ok) return (await res.json()) as T;
+      if (res.ok) return { data: (await res.json()) as T, status: res.status };
       // A 404 means the film is gone; anything else (429, 5xx) is worth another go.
-      if (res.status !== 429 && res.status < 500) return null;
+      if (res.status !== 429 && res.status < 500) return { data: null, status: res.status };
+      if (attempt >= attempts) return { data: null, status: res.status };
     } catch {
       /* network error — fall through to the retry */
     }
     if (attempt < attempts) await new Promise((r) => setTimeout(r, 400 * attempt));
   }
-  return null;
+  return { data: null, status: null };
 }
 
 /**
@@ -118,17 +136,17 @@ async function tmdbGet<T>(path: string, params: Record<string, string>, attempts
 export async function getKeywords(
   tmdbId: number,
   attempts = 1,
-): Promise<{ ok: boolean; keywords: string[] }> {
-  const data = await tmdbGet<{ keywords?: { id?: number; name?: string }[] }>(
+): Promise<{ ok: boolean; missing: boolean; keywords: string[] }> {
+  const { data, status } = await tmdbGet<{ keywords?: { id?: number; name?: string }[] }>(
     `/movie/${tmdbId}/keywords`,
     {},
     attempts,
   );
-  if (data === null) return { ok: false, keywords: [] };
+  if (data === null) return { ok: false, missing: status === 404, keywords: [] };
   const names = (data.keywords ?? [])
     .map((k) => String(k.name ?? "").trim())
     .filter(Boolean);
-  return { ok: true, keywords: names };
+  return { ok: true, missing: false, keywords: names };
 }
 
 /**
@@ -149,12 +167,12 @@ export async function getMovieVideos(tmdbId: number): Promise<TrailerLookup> {
   const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.value as TrailerLookup;
 
-  const data = await tmdbGet<{ results?: (TmdbVideo & { official?: boolean; size?: number; iso_639_1?: string; iso_3166_1?: string; published_at?: string })[] }>(
+  const { data, status } = await tmdbGet<{ results?: (TmdbVideo & { official?: boolean; size?: number; iso_639_1?: string; iso_3166_1?: string; published_at?: string })[] }>(
     `/movie/${tmdbId}/videos`,
     {},
   );
   if (data === null) {
-    return { ok: false, videos: [] };
+    return { ok: false, missing: status === 404, videos: [] };
   }
   const videos = (data.results ?? [])
     .filter(
@@ -171,7 +189,7 @@ export async function getMovieVideos(tmdbId: number): Promise<TrailerLookup> {
       // teasers and Comic-Con first looks).
       return (b.published_at ?? "").localeCompare(a.published_at ?? "");
     });
-  const result: TrailerLookup = { ok: true, videos };
+  const result: TrailerLookup = { ok: true, missing: false, videos };
   cache.set(cacheKey, { ts: Date.now(), value: result });
   return result;
 }
@@ -204,6 +222,8 @@ export interface RegionProviders {
   buy: WatchProvider[];
 }
 export interface ProvidersLookup {
+  /** True when TMDB says the film does not exist, so retrying can never help. */
+  missing: boolean;
   ok: boolean; // true = TMDB answered (regions may be empty)
   regions: RegionProviders[];
 }
@@ -268,14 +288,14 @@ export async function getWatchProviders(tmdbId: number, attempts = 1): Promise<P
   const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.ts < CACHE_TTL_MS) return hit.value as ProvidersLookup;
 
-  const data = await tmdbGet<{ results?: Record<string, RawRegion> }>(
+  const { data, status } = await tmdbGet<{ results?: Record<string, RawRegion> }>(
     `/movie/${tmdbId}/watch/providers`,
     {},
     attempts,
   );
-  if (data === null) return { ok: false, regions: [] };
+  if (data === null) return { ok: false, missing: status === 404, regions: [] };
 
-  const value: ProvidersLookup = { ok: true, regions: normalizeWatchProviders(data.results) };
+  const value: ProvidersLookup = { ok: true, missing: false, regions: normalizeWatchProviders(data.results) };
   cache.set(cacheKey, { ts: Date.now(), value });
   return value;
 }
