@@ -10,6 +10,7 @@
  */
 
 import { getPool, closePool } from "../src/db/pool.js";
+import { budgetSnapshot } from "../src/services/llmBudget.js";
 import { resolveAgentModel, getModelRuntime } from "../src/agent/runtime.js";
 import { config } from "../src/config.js";
 import { logger } from "../src/logger.js";
@@ -78,6 +79,7 @@ async function main(): Promise<void> {
     const available = await runtime.getAvailable();
     const resolved = await resolveAgentModel();
     report.agent = {
+      budget: budgetSnapshot(),
       model: config.agent.model ?? "auto (see fallbacks)",
       resolved_model: resolved ? `${resolved.provider}/${resolved.id}` : null,
       available_models: available.map((m) => `${m.provider}/${m.id}`),

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.js";
+import { budgetSnapshot, resetBudget, tryConsume } from "../src/services/llmBudget.js";
 import type { HybridSearchRequest, Queryable } from "../src/models.js";
 
 async function fakeDb(): Promise<Queryable> {
