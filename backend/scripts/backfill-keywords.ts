@@ -61,6 +61,7 @@ async function main(): Promise<void> {
     let filled = 0;
     let empty = 0;
     let failed = 0;
+    let missingFromTmdb = 0;
     let consecutiveFailures = 0;
     const started = Date.now();
 
@@ -73,8 +74,19 @@ async function main(): Promise<void> {
 
             // Retries matter here: a single reset recorded as "no keywords" would be
             // permanent and wrong. See tmdbGet's attempts parameter.
-            const { ok, keywords } = await getKeywords(tmdbId, 4);
+            const { ok, missing, keywords } = await getKeywords(tmdbId, 4);
             if (!ok) {
+                if (missing) {
+                    // TMDB says the film does not exist — a definitive answer, so
+                    // record it as checked rather than retrying it forever.
+                    await pool.query(
+                        "UPDATE movies SET keywords = '', keywords_checked = true WHERE tmdb_id = $1",
+                        [tmdbId],
+                    );
+                    done += 1;
+                    missingFromTmdb += 1;
+                    continue;
+                }
                 // Unreachable: leave unchecked so a later run retries rather than
                 // recording a wrong answer as final.
                 failed += 1;
@@ -103,7 +115,8 @@ async function main(): Promise<void> {
 
     const elapsed = ((Date.now() - started) / 1000).toFixed(0);
     console.log(
-        `Done: ${done} checked, ${filled} with keywords, ${empty} without, ${failed} unreachable (${elapsed}s)`,
+        `Done: ${done} checked, ${filled} with keywords, ${empty} without, ` +
+            `${missingFromTmdb} not on TMDB at all, ${failed} unreachable (${elapsed}s)`,
     );
     if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
         console.error(

@@ -210,6 +210,14 @@ npm run backfill:providers -- --all         # whole catalogue
   what either vector contains, `npm run embeddings` re-embeds locally;
   `npm run embeddings:remote -- --all` does production, and re-embedding is ~7
   minutes per vector locally.
+- **"Failure is not empty" has a sharp edge: a 404 *is* an answer.** The TMDB client
+  now reports the HTTP status alongside the payload, so a film TMDB says does not
+  exist is recorded as checked-with-nothing (`providers = []`, empty keywords) rather
+  than retried forever, while a network failure still leaves the row unchecked for a
+  later run. Two deleted films had been sitting permanently pending — confirmed by
+  hand as `404 The resource you requested could not be found` — and were re-fetched on
+  every refresh for nothing. The distinction is why `TmdbResponse.status` exists; do
+  not collapse it back into "null means no".
 - **Keywords come from `npm run backfill:keywords`** (one TMDB
   `/movie/{id}/keywords` call per film, resumable via `keywords_checked`, ordered
   most-voted-first). 26,130 of 30,712 films have them. `tmdbGet` retries only when
