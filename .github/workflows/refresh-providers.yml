@@ -21,6 +21,10 @@ on:
         description: "Re-fetch films whose provider data is older than this many days (0 = every film)"
         required: false
         default: "30"
+      limit:
+        description: "Stop after this many films (blank = the whole selection). Useful for a cautious manual run."
+        required: false
+        default: ""
 
 # A refresh is idempotent but long; never let two run at once.
 concurrency:
@@ -68,5 +72,12 @@ jobs:
           PROVIDER_CONCURRENCY: "12"
         # --all matters here: without it the script defaults to a 1,000-film
         # budget, which would refresh only a slice of the catalogue each month.
+        # A manual run may bound itself with `limit` instead.
         run: |
-          npm run backfill:providers -- --stale-days ${{ github.event.inputs.stale_days || '30' }} --all
+          LIMIT="${{ github.event.inputs.limit }}"
+          STALE="${{ github.event.inputs.stale_days || '30' }}"
+          if [ -n "$LIMIT" ]; then
+            npm run backfill:providers -- --stale-days "$STALE" --limit "$LIMIT"
+          else
+            npm run backfill:providers -- --stale-days "$STALE" --all
+          fi
