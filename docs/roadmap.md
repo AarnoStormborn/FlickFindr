@@ -148,9 +148,15 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   funded. Verified end-to-end from the Vercel origin: 17s cold-start turn, 5
   curated cards, no errors. Measured on DeepSeek once warm: 7-9s per turn,
   always on attempt 0 (no fallback retries), ~$0.003-0.01 per turn.
-- **Spend exposure:** the only guard is the per-IP rate limit (8 chat turns/min).
-  There is no global daily cap, so a determined abuser on many IPs could drain
-  the provider balance. Balance is currently small, which is its own limit.
+- **Spend exposure: bounded by a shared daily budget.** Per-IP rate limiting was the
+  only guard, and it cannot bound a bill: plot search *also* calls the model once per
+  request (the rewrite), so an abuser on a few IPs never trips a per-IP ceiling. A
+  process-wide `AGENT_DAILY_BUDGET` (default 300, `src/services/llmBudget.ts`) now caps
+  model-backed requests per UTC day, and `GET /` reports what is left. The two paths
+  behave differently when it is spent, deliberately: **chat answers 429** (a turn is
+  several model calls and cannot work without one) while **plot search degrades to the
+  unrewritten query**, which the eval set measures as equal or better on well-formed
+  input. The counter is in-memory — an abuse guard, not accounting.
 - **Measured limits of free tiers:** a turn costs several model calls, so
   per-minute token caps dominate — Groq free measured 36-165s per turn at
   ~60% success, and Command Code's free models cap at ~100 requests/day. This
