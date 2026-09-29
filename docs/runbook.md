@@ -188,6 +188,14 @@ npm run backfill:providers -- --all         # whole catalogue
   outrank well-known ones ("a young wizard at a magic school" put two films with
   61 and 861 votes above Harry Potter). Define moods in `frontend/src/data/moods.js`
   with filters until Search relevance lands.
+- **The model budget is a spend guard, and it is in-memory.** `AGENT_DAILY_BUDGET`
+  (default 300) caps model-backed requests per **UTC** day, shared across all clients,
+  because per-IP limits cannot bound a bill — every plot search calls the model once.
+  `GET /` and `npm run check` report `used`/`remaining`/`resetsAt`. Two behaviours to
+  know when it is exhausted: chat answers **429** (a turn needs several model calls),
+  while plot search keeps working with the **unrewritten** query. The counter lives in
+  memory: on a single instance a restart resets it, and if the service is ever scaled
+  to several instances each gets its own budget — it is an abuse guard, not accounting.
 - **Plot search depends on the agent, and the rewrite is part of ranking.**
   `/search/semantic` and `/search/hybrid` run the query through the LLM parser and
   embed the *interpreted* query, not the user's words (falling back to the raw

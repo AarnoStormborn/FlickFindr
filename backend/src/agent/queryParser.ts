@@ -5,6 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
+import { tryConsume } from "../services/llmBudget.js";
 import { HybridSearchRequestSchema, type HybridSearchRequest } from "../models.js";
 import { AGENT_DIR, getModelRuntime, resolveAgentModel } from "./runtime.js";
 
@@ -122,6 +123,13 @@ export async function parseSearchQuery(rawQuery: string): Promise<HybridSearchRe
   const hit = parseCache.get(key);
   if (hit && Date.now() - hit.ts < PARSE_CACHE_TTL_MS) {
     return hit.value;
+  }
+  // Only a real model call costs anything, so the budget is taken here: after the
+  // cache (a cache hit is free) and before the request. When the day's budget is
+  // spent, search degrades to the query the user typed rather than failing — the
+  // eval set measures that as equal or slightly better on well-formed queries.
+  if (!tryConsume()) {
+    return { query: rawQuery, skip: 0, limit: 10 };
   }
   const result = await parseSearchQueryImpl(rawQuery);
   // only cache successful (non-fallback, parsed) results

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lastAssistantText, parseJsonObject, parseSearchQuery } from "../src/agent/queryParser.js";
+import { budgetSnapshot, resetBudget, tryConsume } from "../src/services/llmBudget.js";
 
 /**
  * The query parser turns a model reply into structured search filters. The two
@@ -117,5 +118,22 @@ describe("parseSearchQuery fallbacks", () => {
     expect(res.query).toBe("   ");
     expect(res.skip).toBe(0);
     expect(res.limit).toBe(10);
+  });
+});
+
+/**
+ * Search must degrade, not fail, when the model budget is spent: the rewrite is an
+ * improvement, not a requirement, and the eval set measures the raw query as equal
+ * or slightly better on well-formed input. This also keeps the app usable with no
+ * funded provider at all.
+ */
+describe("parseSearchQuery without budget", () => {
+  it("falls back to the raw query instead of calling the model", async () => {
+    const { limit } = budgetSnapshot();
+    for (let i = 0; i < limit; i += 1) tryConsume();
+
+    const result = await parseSearchQuery("a heist film with a twist");
+    expect(result).toEqual({ query: "a heist film with a twist", skip: 0, limit: 10 });
+    resetBudget();
   });
 });

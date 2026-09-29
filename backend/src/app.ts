@@ -9,6 +9,7 @@ import { flicksRoutes } from "./routes/flicks.js";
 import { searchRoutes } from "./routes/search.js";
 import { chatRoutes } from "./routes/chat.js";
 import { isAgentConfigured } from "./agent/runtime.js";
+import { budgetSnapshot } from "./services/llmBudget.js";
 
 export interface AppDeps {
   db: Queryable;
@@ -54,6 +55,9 @@ export function buildApp(deps: AppDeps) {
       // Whether a model is actually authenticated. Lets clients tell a real
       // outage from "the concierge was never switched on" without guessing.
       configured: config.agent.enabled && (await isAgentConfigured()),
+      // Remaining daily allowance for model-backed requests, so spend is visible
+      // without log-diving. Resets at midnight UTC.
+      budget: budgetSnapshot(),
     },
   }));
 

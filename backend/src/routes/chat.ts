@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
+import { tryConsume } from "../services/llmBudget.js";
 import type { Queryable } from "../models.js";
 import { createChatRunner } from "../agent/chat.js";
 
@@ -51,6 +52,15 @@ export function chatRoutes(app: FastifyInstance, deps: { db: Queryable; embed: (
     async (request, reply) => {
     if (!config.agent.enabled) {
       return reply.code(503).send({ detail: "Agent chat is disabled (AGENT_ENABLED=false)" });
+    }
+    // A turn is several model calls and cannot work without a model, so unlike plot
+    // search (which falls back to the raw query) this refuses once the shared daily
+    // budget is spent. The per-IP limit above bounds a burst; this bounds the day.
+    if (!tryConsume()) {
+      logger.warn("Daily agent budget exhausted; rejecting chat turn");
+      return reply.code(429).send({
+        detail: "The daily concierge budget for this service is spent. Please try again tomorrow.",
+      });
     }
     const parsed = ChatRequestSchema.safeParse(request.body);
     if (!parsed.success) {
