@@ -1,0 +1,72 @@
+name: Refresh watch providers
+
+# Streaming rights move constantly, so the provider backfill is not a one-time job:
+# without a refresh, "Where to watch" slowly becomes wrong. Trailers are refreshed
+# by a monthly timer on the Pi because that job already lives there; providers live
+# in the TypeScript backend, and reimplementing the region/logo handling in the Pi's
+# Python would be two sources of truth for the same parsing. So this runs in CI
+# instead, reusing the same script and the same code path.
+#
+# Required repository secrets: SUPABASE_DATABASE_URL, TMDB_API_KEY (the same two
+# values Render already holds).
+
+on:
+  schedule:
+    # 04:17 UTC on the 1st. Monthly is the right order of magnitude for licensing
+    # changes, and matches the trailer refresh cadence.
+    - cron: "17 4 1 * *"
+  workflow_dispatch:
+    inputs:
+      stale_days:
+        description: "Re-fetch films whose provider data is older than this many days (0 = every film)"
+        required: false
+        default: "30"
+
+# A refresh is idempotent but long; never let two run at once.
+concurrency:
+  group: refresh-providers
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    # A full catalogue refresh runs ~25 minutes; this bounds a pathological run.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets are configured
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          TMDB: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$TMDB" ]; then
+            echo "::error::Set SUPABASE_DATABASE_URL and TMDB_API_KEY repository secrets: this job writes to production and calls TMDB."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        working-directory: backend
+        run: npm ci
+
+      - name: Refresh provider data
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          # 16 measured faster but doubled the transient-failure rate; see the
+          # backfill script's notes.
+          PROVIDER_CONCURRENCY: "12"
+        # --all matters here: without it the script defaults to a 1,000-film
+        # budget, which would refresh only a slice of the catalogue each month.
+        run: |
+          npm run backfill:providers -- --stale-days ${{ github.event.inputs.stale_days || '30' }} --all

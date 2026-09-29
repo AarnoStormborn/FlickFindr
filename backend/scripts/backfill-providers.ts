@@ -38,6 +38,26 @@ const LIMIT = ALL
     : Number(process.env.PROVIDER_BACKFILL_LIMIT ?? 1000);
 const BATCH = 200;
 /**
+ * Refresh mode. Without it only never-checked films are fetched; with it, films
+ * whose stored availability may be out of date are re-fetched too, oldest first.
+ * Streaming rights move constantly, so a one-time backfill is not the end state —
+ * this is what a scheduled run uses.
+ */
+const staleArg = args.indexOf("--stale-days");
+const STALE_DAYS = staleArg !== -1 ? Number(args[staleArg + 1]) : null;
+/**
+ * `--stale-days 0` means "every film", which is deliberately *not* the same as the
+ * age predicate with a zero interval: `updated_at < now()` is true of rows written
+ * a moment ago, so the loop would re-select its own output forever. Zero therefore
+ * drops the age filter entirely, and the oldest-first ordering still guarantees the
+ * run drains because each written row moves to the back of that ordering.
+ */
+const REFRESH_EVERYTHING = STALE_DAYS === 0;
+if (staleArg !== -1 && (!Number.isFinite(STALE_DAYS) || Number(STALE_DAYS) < 0)) {
+  logger.error({ value: args[staleArg + 1] }, "invalid --stale-days");
+  process.exit(1);
+}
+/**
  * Films fetched at once. Sequential fetching with a 150ms courtesy pause ran at
  * ~2 films/s, which is hours for the catalogue; TMDB tolerates far more, and the
  * measured keyword backfill sustained 23/s on the same client.
@@ -59,11 +79,24 @@ async function main(): Promise<void> {
   const pool = getPool();
   const regions = configuredRegions();
 
-  const { rows: pendingRows } = await pool.query(
-    "SELECT count(*)::int AS n FROM movies WHERE providers_checked = false AND tmdb_id IS NOT NULL",
-  );
+  const { rows: pendingRows } = STALE_DAYS === null
+    ? await pool.query("SELECT count(*)::int AS n FROM movies WHERE providers_checked = false AND tmdb_id IS NOT NULL")
+    : REFRESH_EVERYTHING
+      ? await pool.query("SELECT count(*)::int AS n FROM movies WHERE tmdb_id IS NOT NULL")
+      : await pool.query(
+          `SELECT count(*)::int AS n FROM movies
+            WHERE tmdb_id IS NOT NULL
+              AND (providers_checked = false OR providers_updated_at IS NULL
+                   OR providers_updated_at < now() - make_interval(days => $1::int))`,
+          [Math.trunc(STALE_DAYS)],
+        );
   logger.info(
-    { regions, target: ALL ? "all" : LIMIT, pending: pendingRows[0]?.n },
+    {
+      regions,
+      mode: STALE_DAYS === null ? "fill" : REFRESH_EVERYTHING ? "refresh (every film)" : `refresh (>${STALE_DAYS} days old)`,
+      target: ALL ? "all" : LIMIT,
+      pending: pendingRows[0]?.n,
+    },
     "watch provider backfill starting",
   );
 
@@ -76,16 +109,27 @@ async function main(): Promise<void> {
 
   while (!stop && checked < LIMIT) {
     const remaining = ALL ? BATCH : Math.min(BATCH, LIMIT - checked);
-    const { rows } = await pool.query(
-      // Vote-weighted, matching how the app itself ranks, so a partial run has
-      // covered the films people actually open. `id` breaks ties so batches
-      // cannot repeat or skip rows.
-      `SELECT id, tmdb_id FROM movies
-        WHERE providers_checked = false AND tmdb_id IS NOT NULL
-        ORDER BY ${WEIGHTED_RATING_SQL} DESC NULLS LAST, id ASC
-        LIMIT $1`,
-      [remaining],
-    );
+    // Fill mode: never-checked films, vote-weighted so a partial run has covered
+    // the films people actually open. Refresh mode: also anything fetched before
+    // the cutoff, oldest first, so repeated runs keep moving forward.
+    const { rows } = STALE_DAYS === null
+      ? await pool.query(
+          `SELECT id, tmdb_id FROM movies
+            WHERE providers_checked = false AND tmdb_id IS NOT NULL
+            ORDER BY ${WEIGHTED_RATING_SQL} DESC NULLS LAST, id ASC
+            LIMIT $1`,
+          [remaining],
+        )
+      : await pool.query(
+          `SELECT id, tmdb_id FROM movies
+            WHERE tmdb_id IS NOT NULL
+              ${REFRESH_EVERYTHING ? "" : `AND (providers_checked = false
+                   OR providers_updated_at IS NULL
+                   OR providers_updated_at < now() - make_interval(days => $2::int))`}
+            ORDER BY providers_updated_at ASC NULLS FIRST, id ASC
+            LIMIT $1`,
+          REFRESH_EVERYTHING ? [remaining] : [remaining, Math.trunc(STALE_DAYS)],
+        );
     if (rows.length === 0) break;
 
     // Fetched concurrently, then written in one statement. Both halves matter:
