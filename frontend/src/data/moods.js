@@ -26,11 +26,17 @@ export const MOODS = [
         displayName: 'Short & Sweet',
         caption: 'Great films that respect your evening',
         // Was blocked until `runtime` was backfilled: the column held data for 12
-        // films, so this row could not exist. It now covers 1,628 films with
-        // 1,000+ votes, narrowed by a rating floor so "Sweet" means something.
-        // Verified top: Grave of the Fireflies, The Lion King, WALL-E, Reservoir
-        // Dogs, The Grand Budapest Hotel, Toy Story.
-        filters: { maxRuntime: 100, minVotes: 1000, minRating: 7.0 },
+        // films, so this row could not exist. It now covers 388 films with 1,000+
+        // votes, narrowed by a rating floor so "Sweet" means something. Verified top:
+        // Grave of the Fireflies, The Lion King, WALL-E, Reservoir Dogs, The Grand
+        // Budapest Hotel, Toy Story.
+        //
+        // The *minimum* runtime is not decoration. A catalogue sweep found 27
+        // dialogue-free shorts — Pixar's "Piper" is 6 minutes, "Bao" 8 — that satisfy
+        // "under 100 minutes, well rated, 1,000+ votes" and would have appeared in a
+        // row promising a film for your evening. They sit below the top page today,
+        // which is exactly why the floor is stated rather than left to the sort order.
+        filters: { minRuntime: 60, maxRuntime: 100, minVotes: 1000, minRating: 7.0 },
     },
     {
         id: 'mind-bending',
