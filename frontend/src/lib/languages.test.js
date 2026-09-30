@@ -56,3 +56,34 @@ describe('languageOptionLabel', () => {
         expect(languageOptionLabel({})).toBe('');
     });
 });
+
+/**
+ * Codes where Intl answers confidently and wrongly. Found by auditing all 88 codes
+ * in the catalogue against TMDB's own /configuration/languages — Intl is a fine
+ * default but it is not the source of this data, so these are pinned.
+ */
+describe('languageName overrides for codes Intl gets wrong', () => {
+    it('calls xx "No dialogue", not "XX"', () => {
+        // TMDB uses xx for films with no spoken dialogue; the rows are silent shorts
+        // ("Lights Out", "One Small Step"). Intl cannot resolve it and we rendered "XX".
+        expect(languageName('xx')).toBe('No dialogue');
+    });
+
+    it('calls sh "Serbo-Croatian", not what Intl says', () => {
+        // Intl resolves sh to "Serbian (Latin)"; TMDB's sh is Serbo-Croatian, and the
+        // rows include Time of the Gypsies.
+        expect(languageName('sh')).toBe('Serbo-Croatian');
+        expect(languageName('sh')).not.toBe('Serbian (Latin)');
+    });
+
+    it('calls tl "Tagalog", matching the code', () => {
+        // tl is ISO 639-1 Tagalog; Intl says "Filipino", which is fil.
+        expect(languageName('tl')).toBe('Tagalog');
+    });
+
+    it('still uses Intl for ordinary codes', () => {
+        // The overrides must not become a second source of names.
+        expect(languageName('fr')).toBe('French');
+        expect(languageName('ja')).toBe('Japanese');
+    });
+});

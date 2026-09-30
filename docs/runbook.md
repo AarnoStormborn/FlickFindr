@@ -155,6 +155,16 @@ npm run backfill:providers -- --all         # whole catalogue
   per-film work (trailers, `--fill`) really is one request per film.
 - **Search pagination is capped at the first 100 results** (`MAX_RESULTS` in
   `src/models.ts`); a `skip` beyond that is a 400 by design.
+- **Language labels come from Intl, but TMDB is the authority — and Intl is wrong for
+  a few codes.** `frontend/src/lib/languages.js` resolves names via
+  `Intl.DisplayNames` and then *overrides* the codes where Intl disagrees with the data
+  source. Auditing all 88 codes in the catalogue against TMDB's own
+  `/configuration/languages` found ten differences, three of them user-visible: `xx`
+  (TMDB's code for films with no dialogue) rendered as "XX", `sh` (Serbo-Croatian)
+  rendered as "Serbian (Latin)", and `tl` (Tagalog) as "Filipino". To re-audit after a
+  catalogue change, compare that endpoint against `SELECT DISTINCT original_language`
+  — the other differences (Bangla/Bengali, Māori/Maori, Ossetic/Ossetian) are the same
+  language under two names and need no fix.
 - **Box office (`gross`) is absent for most obscure films, and that is the data,
   not a bug.** Coverage is 43.7% overall, but **89.9%** of films with 1,000+ votes
   and **99.5%** of those with 10,000+. TMDB has no revenue for the long tail, so
