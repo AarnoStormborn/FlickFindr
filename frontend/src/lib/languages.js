@@ -35,6 +35,29 @@ const COMMON = {
     ar: 'Arabic',
 };
 
+/**
+ * Codes where `Intl.DisplayNames` disagrees with TMDB, which is the source of the data.
+ * Consulted *before* Intl, because Intl returns a confident wrong answer for some of
+ * these rather than nothing.
+ *
+ * Found by auditing all 88 codes in the catalogue against TMDB's own
+ * `/configuration/languages`: ten differed, most of them harmlessly (Bangla/Bengali,
+ * Maori/Māori, Ossetic/Ossetian are the same language under two names), but three
+ * were wrong in a way a viewer would notice:
+ *
+ *   xx  — TMDB's code for films with no spoken dialogue. Intl has no idea and we
+ *         rendered "XX"; the rows are dialogue-free shorts like "Lights Out" and
+ *         "One Small Step".
+ *   sh  — TMDB uses it for Serbo-Croatian; Intl resolves it to "Serbian (Latin)".
+ *         The rows include Time of the Gypsies, a Serbo-Croatian film.
+ *   tl  — ISO 639-1 Tagalog; Intl says "Filipino", which is `fil`.
+ */
+const OVERRIDES = {
+    xx: 'No dialogue',
+    sh: 'Serbo-Croatian',
+    tl: 'Tagalog',
+};
+
 let displayNames;
 try {
     displayNames = typeof Intl !== 'undefined' && Intl.DisplayNames
@@ -53,6 +76,8 @@ export function languageName(code) {
     if (!code || typeof code !== 'string') return null;
     const key = code.trim().toLowerCase();
     if (!key) return null;
+    // Checked first: see OVERRIDES — Intl answers these wrongly rather than not at all.
+    if (OVERRIDES[key]) return OVERRIDES[key];
     try {
         const name = displayNames?.of(key);
         // Intl returns the input unchanged when it cannot resolve it, and
