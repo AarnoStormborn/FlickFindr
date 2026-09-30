@@ -65,7 +65,7 @@ describe('MoodPage', () => {
         const calls = stubFetch([film(1, 'Toy Story')], 1);
         renderMood('short-and-sweet');
         await waitFor(() => expect(calls.length).toBeGreaterThan(0));
-        expect(calls[0].body).toMatchObject({ max_runtime: 100, min_votes: 1000, min_rating: 7.0 });
+        expect(calls[0].body).toMatchObject({ min_runtime: 60, max_runtime: 100, min_votes: 1000, min_rating: 7.0 });
     });
 
     it('reports an unknown mood instead of rendering an empty page', async () => {

@@ -147,6 +147,30 @@ npm run backfill:providers -- --all         # whole catalogue
   `CORS_ORIGINS`, and a model key (`DEEPSEEK_API_KEY`, `GROQ_API_KEY`,
   `COMMAND_CODE_API_KEY`, …).
 
+## Catalogue data quality: what is normal
+
+A sweep of the whole catalogue (counts, nulls, ranges, duplicates, derived columns)
+now passes clean on the structural things: no missing `tmdb_id`, no duplicate `tmdb_id`,
+no ratings outside 0-10, no uncastable vote counts, no impossible years, no missing
+embeddings or keyword vectors, no `providers_checked` row without a payload, and no
+trailer marked checked without having been asked. Four things look anomalous and are
+**not** bugs, recorded so nobody re-investigates them:
+
+- **362 films run 1-10 minutes.** They are shorts, and real ones: Pixar's "Piper" (6),
+  "Bao" (8), "For the Birds" (4), each with over a thousand votes. This is why
+  "Short & Sweet" carries `minRuntime: 60` — 27 of them otherwise satisfy its filters.
+- **52 name+year collisions** (three "Escape"s, two "Aladdin"s) are *different* films
+  with different `tmdb_id`s and different ratings, not duplicate rows.
+- **11 films have no genre, 22 have a one-line "plot"** ("not there yet", "A comedy
+  show."), **47 have no runtime, 8 have no poster.** Checked against TMDB directly:
+  the data is absent upstream, not dropped by the ingest. One exception was found and
+  left alone as a one-row fix ("Hail, Sarajevo" is a Documentary on TMDB).
+- **`xx` is a real language code** — TMDB's marker for films without dialogue — and is
+  labelled "No dialogue" rather than being treated as unknown.
+
+Re-run the sweep by querying for nulls and out-of-range values per column
+(`information_schema` gives the columns; `assessCatalog` covers the coverage figures).
+
 ## Known sharp edges
 
 - **TMDB caps `/discover` at 500 pages** (10k results) per query, which is why
