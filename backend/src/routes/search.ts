@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { parseSearchQuery } from "../agent/queryParser.js";
+import { mergeAgentParse, parseSearchQuery } from "../agent/queryParser.js";
 import { logger } from "../logger.js";
 import {
   HybridSearchRequestSchema,
@@ -112,20 +112,14 @@ export function searchRoutes(app: FastifyInstance, deps: SearchDeps): void {
       return reply.code(400).send({ detail: parsed.error.issues[0]?.message ?? "Invalid request" });
     }
     try {
-      // Agent enriches: interpret query intent into filters + semantic query.
-      const enriched = await agentParse(parsed.data.query);
-      const merged: HybridSearchRequest = {
-        query: enriched.query.trim() ? enriched.query : parsed.data.query,
-        limit: parsed.data.limit,
-        skip: parsed.data.skip,
-        genre: enriched.genre ?? parsed.data.genre,
-        directors: enriched.directors ?? parsed.data.directors,
-        stars: enriched.stars ?? parsed.data.stars,
-        min_rating: enriched.min_rating ?? parsed.data.min_rating,
-        max_rating: enriched.max_rating ?? parsed.data.max_rating,
-        min_runtime: enriched.min_runtime ?? parsed.data.min_runtime,
-        max_runtime: enriched.max_runtime ?? parsed.data.max_runtime,
-      };
+      // Agent enriches: interpret query intent into filters + semantic query. The merge
+      // re-validates the model's output, because those fields are model-generated and
+      // reach the query builder directly; a hallucinated bound would silently empty the
+      // results. On rejection the caller's own request is used.
+      const { request: merged, invalid } = mergeAgentParse(parsed.data, await agentParse(parsed.data.query));
+      if (invalid) {
+        logger.warn({ invalid }, "Agent filters rejected as invalid; searching without them");
+      }
       const { movies, total, exact_matches, message } = await semanticService.hybridSearch(db, merged, embed);
       const body: SemanticSearchResponse = {
         results: movies,

@@ -227,6 +227,14 @@ Re-run the sweep by querying for nulls and out-of-range values per column
   outrank well-known ones ("a young wizard at a magic school" put two films with
   61 and 861 votes above Harry Potter). Define moods in `frontend/src/data/moods.js`
   with filters until Search relevance lands.
+- **The agent's filters are re-validated before use.** `/search/hybrid` merges the
+  model's interpretation into the caller's request, and those fields go to the query
+  builder directly, so `mergeAgentParse` runs the merge back through
+  `HybridSearchRequestSchema`: a hallucinated `min_rating: 99` would otherwise reach
+  SQL and silently return an empty page. On rejection the caller's own request is used
+  (an unfiltered search beats an empty one) and the reason is logged. Precedence is
+  unchanged and worth knowing: the agent's filters win over the request's, while the
+  query text and page window always come from the caller.
 - **The parse cache is keyed on "the model answered", not on "the answer differs".**
   An unchanged reply can still carry filters the model extracted, and the prompt now
   asks it to preserve the user's wording (30 of 38 eval rewrites come back identical),

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { lastAssistantText, parseJsonObject, parseSearchQuery, resolveAgentReply } from "../src/agent/queryParser.js";
+import {
+  lastAssistantText,
+  mergeAgentParse,
+  parseJsonObject,
+  parseSearchQuery,
+  resolveAgentReply,
+} from "../src/agent/queryParser.js";
 import { budgetSnapshot, resetBudget, tryConsume } from "../src/services/llmBudget.js";
 
 /**
@@ -204,4 +210,63 @@ describe("parse cache only remembers real answers", () => {
     expect(budgetSnapshot().used - before).toBe(2);
     resetBudget();
   }, 30_000);
+});
+
+/**
+ * The agent's filters are model-generated and used to reach the query builder
+ * directly, so they are re-validated on merge. #50 made the parser accept more
+ * parses (including ones that keep the user's wording), which means more of these
+ * fields actually take effect — so the bound matters more than it did.
+ */
+describe("mergeAgentParse", () => {
+  const base = { query: "a heist film", skip: 0, limit: 10 } as const;
+
+  it("lets the agent fill gaps the request did not specify", () => {
+    const { request, invalid } = mergeAgentParse(
+      { ...base },
+      { query: "a crew robs a casino", genre: "Crime", stars: "George Clooney", max_runtime: 120 },
+    );
+    expect(invalid).toBeUndefined();
+    expect(request).toMatchObject({
+      query: "a crew robs a casino",
+      genre: "Crime",
+      stars: "George Clooney",
+      max_runtime: 120,
+    });
+  });
+
+  it("keeps the caller's query and page window, letting the agent's filters win", () => {
+    // Pre-existing precedence, pinned rather than changed here: the agent's genre
+    // overrides, but the caller's query text and page window are never taken from the
+    // model. In practice the hybrid UI sends no filters, so this is mostly hypothetical.
+    const { request } = mergeAgentParse(
+      { query: "a heist film", genre: "Comedy", limit: 5, skip: 20 },
+      { query: "a crew robs a casino", genre: "Crime", stars: "Someone" },
+    );
+    expect(request.genre).toBe("Crime");
+    expect(request.query).toBe("a crew robs a casino");
+    expect(request.limit).toBe(5);
+    expect(request.skip).toBe(20);
+  });
+
+  it("uses the caller's query when the agent returns none", () => {
+    const { request } = mergeAgentParse({ ...base }, { query: "   " });
+    expect(request.query).toBe("a heist film");
+  });
+
+  it("rejects an out-of-range filter and falls back to the caller's request", () => {
+    // A hallucinated bound would otherwise reach SQL and silently return nothing.
+    const { request, invalid } = mergeAgentParse({ ...base }, { query: "a heist film", min_rating: 99 });
+    // The message text is zod's; what matters is that it is reported and the field is
+    // dropped rather than reaching SQL.
+    expect(invalid).toBeTruthy();
+    expect(request.min_rating).toBeUndefined();
+    expect(request.query).toBe("a heist film");
+  });
+
+  it("rejects a negative runtime the same way", () => {
+    const { request, invalid } = mergeAgentParse({ ...base }, { query: "a heist film", max_runtime: -5 });
+    expect(invalid).toBeTruthy();
+    expect(request.max_runtime).toBeUndefined();
+  });
 });
