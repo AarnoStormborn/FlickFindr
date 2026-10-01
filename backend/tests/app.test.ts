@@ -84,6 +84,35 @@ describe("FlickFindr API (injected deps)", () => {
     expect(res.json().id).toBe(1);
   });
 
+  it("ignores a hallucinated agent filter instead of returning nothing", async () => {
+    // The agent's filters are model-generated and reach the query builder, so they are
+    // re-validated on merge. Before that, `min_rating: 99` would have been handed to
+    // SQL and quietly returned an empty page. Asserted at the route so the wiring is
+    // covered, not just the pure merge.
+    const seen: string[] = [];
+    const app2 = buildApp({
+      db: {
+        async query(sql: string) {
+          seen.push(sql);
+          if (sql.includes("count(*)")) return { rows: [{ total: 1 }] };
+          return { rows: [{ id: 1, movie_name: "The Dark Knight", rating: 9, runtime: 152 }] };
+        },
+      } as unknown as Queryable,
+      embed: async () => [0.1],
+      agentParse: async (query: string) => ({ query, min_rating: 99, skip: 0, limit: 10 }) as never,
+    });
+    await app2.ready();
+    const res = await app2.inject({
+      method: "POST",
+      url: "/search/hybrid",
+      payload: { query: "a film rated impossibly highly", limit: 5 },
+    });
+    expect(res.statusCode).toBe(200);
+    // The bad bound never reached the database.
+    expect(seen.join(" ")).not.toContain("99");
+    await app2.close();
+  });
+
   it("GET /flicks/movie/:id/similar returns a results array", async () => {
     const res = await app.inject({ method: "GET", url: "/flicks/movie/1/similar?limit=5" });
     expect(res.statusCode).toBe(200);
