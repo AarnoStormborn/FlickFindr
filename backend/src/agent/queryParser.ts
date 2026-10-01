@@ -108,6 +108,43 @@ export function resolveAgentReply(
   return { request: { query: rawQuery, skip: 0, limit: 10 }, parsed: false };
 }
 
+/**
+ * Merge the agent's interpretation with the caller's explicit request.
+ *
+ * The agent's output is model-generated, so it is re-validated here rather than
+ * trusted: `HybridSearchRequestSchema` bounds every filter (ratings 0-10, non-negative
+ * runtimes), and until now those fields went straight into the query builder, where a
+ * hallucinated `min_rating: 99` would silently return nothing. Explicit request fields
+ * always win; the agent only fills gaps.
+ *
+ * On rejection the caller's own request is used unchanged, so a bad interpretation
+ * degrades to an unfiltered search rather than an empty one. Exported because the rule
+ * is worth testing without a model.
+ */
+export function mergeAgentParse(
+  base: HybridSearchRequest,
+  /** Whatever the model returned — partial, and only `query` is checked by the parser. */
+  enriched: Partial<HybridSearchRequest>,
+): { request: HybridSearchRequest; invalid?: string } {
+  const merged: HybridSearchRequest = {
+    query: enriched.query?.trim() ? enriched.query : base.query,
+    limit: base.limit,
+    skip: base.skip,
+    genre: enriched.genre ?? base.genre,
+    directors: enriched.directors ?? base.directors,
+    stars: enriched.stars ?? base.stars,
+    min_rating: enriched.min_rating ?? base.min_rating,
+    max_rating: enriched.max_rating ?? base.max_rating,
+    min_runtime: enriched.min_runtime ?? base.min_runtime,
+    max_runtime: enriched.max_runtime ?? base.max_runtime,
+  };
+  const valid = HybridSearchRequestSchema.safeParse(merged);
+  if (!valid.success) {
+    return { request: { ...base }, invalid: valid.error.issues[0]?.message ?? "invalid agent filters" };
+  }
+  return { request: valid.data };
+}
+
 /** Build a minimal resource loader (no extensions/skills/prompts from disk). */
 async function minimalLoader(): Promise<DefaultResourceLoader> {
   const loader = new DefaultResourceLoader({
