@@ -183,3 +183,25 @@ describe("parseSearchQuery without budget", () => {
     resetBudget();
   });
 });
+
+/**
+ * Caching is now keyed on "the model answered", not "the answer differs from the
+ * input". This is the half of that rule a test can reach without a live model: a
+ * parse that *failed* must not be cached, or a transient outage would be remembered
+ * for the cache TTL. (The other half — an unchanged answer being cached — is verified
+ * against the running service, since it requires a real model reply.)
+ */
+describe("parse cache only remembers real answers", () => {
+  it("does not cache a failed parse", async () => {
+    resetBudget();
+    const before = budgetSnapshot().used;
+    // No provider credentials in the test environment, so this fails fast and falls
+    // back. Both calls must reach the model, which is how we observe "not cached".
+    const first = await parseSearchQuery("a film about a lighthouse keeper we have never asked about");
+    const second = await parseSearchQuery("a film about a lighthouse keeper we have never asked about");
+    expect(first.query).toBe("a film about a lighthouse keeper we have never asked about");
+    expect(second.query).toBe(first.query);
+    expect(budgetSnapshot().used - before).toBe(2);
+    resetBudget();
+  }, 30_000);
+});

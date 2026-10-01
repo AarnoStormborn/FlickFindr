@@ -227,6 +227,13 @@ Re-run the sweep by querying for nulls and out-of-range values per column
   outrank well-known ones ("a young wizard at a magic school" put two films with
   61 and 861 votes above Harry Potter). Define moods in `frontend/src/data/moods.js`
   with filters until Search relevance lands.
+- **The parse cache is keyed on "the model answered", not on "the answer differs".**
+  An unchanged reply can still carry filters the model extracted, and the prompt now
+  asks it to preserve the user's wording (30 of 38 eval rewrites come back identical),
+  so caching only changed queries meant those searches re-called the model on every
+  repeat — spending budget and a second of latency for an answer already known.
+  Failures are still not cached, so a transient outage is not remembered for the TTL.
+  Cache hits are free in both senses: no budget unit and no model call.
 - **The model budget is a spend guard, and it is in-memory.** `AGENT_DAILY_BUDGET`
   (default 300) caps model-backed requests per **UTC** day, shared across all clients,
   because per-IP limits cannot bound a bill — every plot search calls the model once.
