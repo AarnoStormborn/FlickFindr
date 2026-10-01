@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lastAssistantText, parseJsonObject, parseSearchQuery } from "../src/agent/queryParser.js";
+import { lastAssistantText, parseJsonObject, parseSearchQuery, resolveAgentReply } from "../src/agent/queryParser.js";
 import { budgetSnapshot, resetBudget, tryConsume } from "../src/services/llmBudget.js";
 
 /**
@@ -108,6 +108,24 @@ describe("parseJsonObject", () => {
     const parsed = parseJsonObject('{"query":"heist","DROP TABLE movies":true}');
     expect(parsed).toBeDefined();
     expect(parsed).not.toHaveProperty("DROP TABLE movies");
+  });
+});
+
+describe("resolveAgentReply", () => {
+  it("preserves filters when the model keeps the user's plot query unchanged", () => {
+    const query = "a heist film with a twist";
+    const reply = JSON.stringify({ query, genre: "Crime", min_rating: 7 });
+    expect(resolveAgentReply(query, reply)).toMatchObject({
+      parsed: true,
+      request: { query, genre: "Crime", min_rating: 7 },
+    });
+  });
+
+  it("rejects a blank plot query", () => {
+    expect(resolveAgentReply("crime film", '{"query":"   ","genre":"Crime"}')).toEqual({
+      parsed: false,
+      request: { query: "crime film", skip: 0, limit: 10 },
+    });
   });
 });
 
