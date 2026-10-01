@@ -98,6 +98,16 @@ export function parseJsonObject(raw: string): HybridSearchRequest | undefined {
   }
 }
 
+/** Preserve model filters even when its plot query is identical to the input. */
+export function resolveAgentReply(
+  rawQuery: string,
+  reply: string,
+): { request: HybridSearchRequest; parsed: boolean } {
+  const parsed = parseJsonObject(reply);
+  if (parsed?.query.trim()) return { request: parsed, parsed: true };
+  return { request: { query: rawQuery, skip: 0, limit: 10 }, parsed: false };
+}
+
 /** Build a minimal resource loader (no extensions/skills/prompts from disk). */
 async function minimalLoader(): Promise<DefaultResourceLoader> {
   const loader = new DefaultResourceLoader({
@@ -170,15 +180,14 @@ async function parseSearchQueryImpl(rawQuery: string): Promise<HybridSearchReque
 
     await session.session.prompt(`${PARSE_PROMPT}\n\nUser query: "${rawQuery}"`);
     const text = lastAssistantText(session.session.messages);
-    const parsed = text ? parseJsonObject(text) : undefined;
+    const resolved = resolveAgentReply(rawQuery, text ?? "");
 
-    // Require a non-empty, non-identical query to consider the parse successful.
-    if (parsed && parsed.query.trim() && parsed.query !== rawQuery) {
-      logger.info({ parsed }, "Agent parsed query");
-      return parsed;
+    if (resolved.parsed) {
+      logger.info({ parsed: resolved.request }, "Agent parsed query");
+      return resolved.request;
     }
     logger.warn({ text }, "Agent parse unusable; falling back to raw query");
-    return fallback;
+    return resolved.request;
   } catch (err) {
     logger.error({ err }, "Agent query parsing failed; falling back to raw query");
     return fallback;

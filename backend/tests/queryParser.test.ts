@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lastAssistantText, parseJsonObject, parseSearchQuery } from "../src/agent/queryParser.js";
+import { lastAssistantText, parseJsonObject, parseSearchQuery, resolveAgentReply } from "../src/agent/queryParser.js";
 import { budgetSnapshot, resetBudget, tryConsume } from "../src/services/llmBudget.js";
 
 /**
@@ -108,6 +108,52 @@ describe("parseJsonObject", () => {
     const parsed = parseJsonObject('{"query":"heist","DROP TABLE movies":true}');
     expect(parsed).toBeDefined();
     expect(parsed).not.toHaveProperty("DROP TABLE movies");
+  });
+});
+
+describe("resolveAgentReply", () => {
+  it.each([
+    {
+      name: "genre and rating",
+      query: "a heist film with a twist",
+      filters: { genre: "Crime", min_rating: 7 },
+    },
+    {
+      name: "cast and runtime",
+      query: "a detective looking for her sister",
+      filters: { stars: "Viola Davis", max_runtime: 120 },
+    },
+    {
+      name: "director and rating ceiling",
+      query: "a family on a cross-country road trip",
+      filters: { directors: "Greta Gerwig", max_rating: 8 },
+    },
+    {
+      name: "no filters",
+      query: "a mystery set in a seaside village",
+      filters: {},
+    },
+  ])("accepts an unchanged plot query with $name", ({ query, filters }) => {
+    const reply = JSON.stringify({ query, ...filters });
+    expect(resolveAgentReply(query, reply)).toEqual({
+      parsed: true,
+      request: { query, ...filters, skip: 0, limit: 10 },
+    });
+  });
+
+  it("accepts a rewritten plot query with filters", () => {
+    const reply = JSON.stringify({ query: "a crew steals from a casino", genre: "Crime" });
+    expect(resolveAgentReply("a casino heist", reply)).toEqual({
+      parsed: true,
+      request: { query: "a crew steals from a casino", genre: "Crime", skip: 0, limit: 10 },
+    });
+  });
+
+  it("rejects a blank plot query", () => {
+    expect(resolveAgentReply("crime film", '{"query":"   ","genre":"Crime"}')).toEqual({
+      parsed: false,
+      request: { query: "crime film", skip: 0, limit: 10 },
+    });
   });
 });
 
