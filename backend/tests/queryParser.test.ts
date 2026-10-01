@@ -112,12 +112,40 @@ describe("parseJsonObject", () => {
 });
 
 describe("resolveAgentReply", () => {
-  it("preserves filters when the model keeps the user's plot query unchanged", () => {
-    const query = "a heist film with a twist";
-    const reply = JSON.stringify({ query, genre: "Crime", min_rating: 7 });
-    expect(resolveAgentReply(query, reply)).toMatchObject({
+  it.each([
+    {
+      name: "genre and rating",
+      query: "a heist film with a twist",
+      filters: { genre: "Crime", min_rating: 7 },
+    },
+    {
+      name: "cast and runtime",
+      query: "a detective looking for her sister",
+      filters: { stars: "Viola Davis", max_runtime: 120 },
+    },
+    {
+      name: "director and rating ceiling",
+      query: "a family on a cross-country road trip",
+      filters: { directors: "Greta Gerwig", max_rating: 8 },
+    },
+    {
+      name: "no filters",
+      query: "a mystery set in a seaside village",
+      filters: {},
+    },
+  ])("accepts an unchanged plot query with $name", ({ query, filters }) => {
+    const reply = JSON.stringify({ query, ...filters });
+    expect(resolveAgentReply(query, reply)).toEqual({
       parsed: true,
-      request: { query, genre: "Crime", min_rating: 7 },
+      request: { query, ...filters, skip: 0, limit: 10 },
+    });
+  });
+
+  it("accepts a rewritten plot query with filters", () => {
+    const reply = JSON.stringify({ query: "a crew steals from a casino", genre: "Crime" });
+    expect(resolveAgentReply("a casino heist", reply)).toEqual({
+      parsed: true,
+      request: { query: "a crew steals from a casino", genre: "Crime", skip: 0, limit: 10 },
     });
   });
 
