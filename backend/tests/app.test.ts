@@ -236,27 +236,42 @@ describe("FlickFindr API (injected deps)", () => {
         });
     });
 
-    describe("pagination depth is capped (MAX_RESULTS)", () => {
-        it("accepts a page that lands inside the top 100", async () => {
-            const res = await app.inject({
-                method: "POST",
-                url: "/search/structural",
-                payload: { limit: 20, skip: 80 },
-            });
-            expect(res.statusCode).toBe(200);
-        });
-
-        it("rejects a skip beyond the cap instead of serving a 30k-deep page", async () => {
+    describe("pagination: size is bounded, depth is not", () => {
+        /**
+         * These two bounds do different jobs and only one is a product decision.
+         * Page *size* is the security-relevant limit: without it `limit=100000`
+         * returned the whole table in a single response. Depth is not capped — paging
+         * deep into a genre is legitimate, and the ranked sort is computed per query
+         * anyway, so a deep page measures the same as the first one (~40-100ms of
+         * sorting either way).
+         */
+        it("serves a deep page instead of refusing it", async () => {
             for (const url of ["/search/structural", "/search/semantic", "/search/hybrid"]) {
-                const res = await app.inject({ method: "POST", url, payload: { query: "a heist film", limit: 20, skip: 100 } });
-                expect(res.statusCode, url).toBe(400);
-                expect(JSON.stringify(res.json())).toMatch(/first 100 results/);
+                const res = await app.inject({
+                    method: "POST",
+                    url,
+                    payload: { query: "a heist film", limit: 20, skip: 5000 },
+                });
+                expect(res.statusCode, url).toBe(200);
             }
         });
 
-        it("still allows the maximum page size from the very start", async () => {
-            const res = await app.inject({ method: "POST", url: "/search/structural", payload: { limit: 100, skip: 0 } });
-            expect(res.statusCode).toBe(200);
+        it("still refuses a page size above the ceiling", async () => {
+            const res = await app.inject({
+                method: "POST",
+                url: "/search/structural",
+                payload: { limit: 100000, skip: 0 },
+            });
+            expect(res.statusCode).toBe(400);
+        });
+
+        it("rejects an absurd offset rather than handing it to Postgres", async () => {
+            const res = await app.inject({
+                method: "POST",
+                url: "/search/structural",
+                payload: { limit: 20, skip: 5_000_000 },
+            });
+            expect(res.statusCode).toBe(400);
         });
     });
 });

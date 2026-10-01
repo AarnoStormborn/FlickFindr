@@ -6,7 +6,7 @@ import { matchLabel } from '../lib/matchLabel';
 import ViewToggle from '../components/ViewToggle';
 import MetadataForm from '../components/MetadataForm';
 import { languageName } from '../lib/languages';
-import { getLanguages, hybridSearch, MAX_RESULTS, semanticSearch, searchMovies } from '../api/movies';
+import { getLanguages, hybridSearch, semanticSearch, searchMovies } from '../api/movies';
 import useViewMode from '../hooks/useViewMode';
 import useSearchHistory from '../hooks/useSearchHistory';
 import './SearchPage.css';
@@ -103,10 +103,8 @@ export default function SearchPage() {
     const { history, recordSearch, clearHistory } = useSearchHistory();
     const activeSearchRef = useRef(null); // descriptor for load-more
 
-    // 20 per page, and never past the top 100 — a ranked recommendation list
-    // does not need to page through all ~31k films. MAX_RESULTS is imported from
-    // the API module, where it mirrors the server's cap; it used to be redeclared
-    // here, which is how a later page quietly drifted out of step.
+    // 20 per page, and "Show more" walks the whole result set. The server bounds a
+    // page's *size*, never how deep you may go.
     const PAGE_SIZE = 20;
 
     // Monotonic generation: responses from an older mode/search are ignored.
@@ -223,9 +221,8 @@ export default function SearchPage() {
     const fetchMore = useCallback(async () => {
         const active = activeSearchRef.current;
         if (!active || moreLoading) return;
-        const cap = Math.min(typeof meta?.total === 'number' ? meta.total : MAX_RESULTS, MAX_RESULTS);
-        const remaining = cap - results.length;
-        if (remaining <= 0) return; // already showing the top 100
+        const remaining = (typeof meta?.total === 'number' ? meta.total : 0) - results.length;
+        if (remaining <= 0) return; // everything already shown
         const limit = Math.min(PAGE_SIZE, remaining); // last page must not overshoot
         setMoreLoading(true);
         setError(null);
@@ -351,7 +348,7 @@ export default function SearchPage() {
     const labelFor = (movie) => matchLabel(movie.similarity_score, topSimilarity);
     const activeStructuralFilters = mode === 'structural' ? urlFilters : null;
 
-    const visibleTotal = Math.min(typeof meta?.total === 'number' ? meta.total : 0, MAX_RESULTS);
+    const visibleTotal = typeof meta?.total === 'number' ? meta.total : 0;
 
     return (
         <div className="search-page">
@@ -431,11 +428,7 @@ export default function SearchPage() {
                                     </p>
                                 )}
                                 {typeof meta.total === 'number' && (
-                                    <p className="search-message">
-                                        {meta.total > MAX_RESULTS
-                                            ? `Top ${MAX_RESULTS} of ${meta.total.toLocaleString()} matches`
-                                            : `${meta.total.toLocaleString()} matches`}
-                                    </p>
+                                    <p className="search-message">{meta.total.toLocaleString()} matches</p>
                                 )}
                                 {isPlotSearch && results.length > 0 && (
                                     <p className="search-message search-ranking-note">
@@ -468,7 +461,7 @@ export default function SearchPage() {
                 {!loading && !error && results.length > 0 && hasMore && results.length < visibleTotal && (
                     <div className="search-more-row">
                         <button className="search-more-btn" onClick={fetchMore} disabled={moreLoading}>
-                            {moreLoading ? 'Loading…' : `Show more (${visibleTotal - results.length} more)`}
+                            {moreLoading ? 'Loading…' : `Show more (${(visibleTotal - results.length).toLocaleString()} more)`}
                         </button>
                     </div>
                 )}

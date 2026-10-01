@@ -177,8 +177,13 @@ Re-run the sweep by querying for nulls and out-of-range values per column
   every sweep segments by year rather than paging the whole catalogue.
 - **There is no bulk-by-id endpoint.** `/movie/summaries` 404s on a v3 key, so
   per-film work (trailers, `--fill`) really is one request per film.
-- **Search pagination is capped at the first 100 results** (`MAX_RESULTS` in
-  `src/models.ts`); a `skip` beyond that is a 400 by design.
+- **Search pagination bounds a page's *size*, not its depth.** `MAX_PAGE_SIZE`
+  (100) is the security-relevant limit — without it `limit=100000` returned the whole
+  table in one response. Depth is deliberately uncapped: paging deep into a genre is
+  legitimate, and because the ranked sort is computed per query anyway, a deep page
+  costs about what the first one does (~40-100ms of sorting either way, measured at
+  `skip` 0, 100, 5000, 20000 and 30700). `MAX_SKIP` (1,000,000) exists only so absurd
+  offsets are a 400 instead of a huge `OFFSET`.
 - **Language labels come from Intl, but TMDB is the authority — and Intl is wrong for
   a few codes.** `frontend/src/lib/languages.js` resolves names via
   `Intl.DisplayNames` and then *overrides* the codes where Intl disagrees with the data
