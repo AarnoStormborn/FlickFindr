@@ -12,15 +12,23 @@ export const SortOrderSchema = z.enum(["asc", "desc"]).default("desc");
 export const SortBySchema = z.enum(SortableFields).default("rating");
 
 /**
- * How deep any single search may paginate.
+ * The largest page any single request may return.
  *
- * The catalogue is ~31k films, and the browse experience is a ranked
- * recommendation list, not an index: paging past a few hundred results is never
- * useful and invites scraping the whole table one page at a time. Callers may
- * request at most this many results in total (skip must land inside the window);
- * the UI surfaces "Top 100" rather than "30,749 matches".
+ * This is the bound that matters for safety: without it a caller could ask for
+ * `limit=100000` and pull the entire table in one response. Depth is *not* capped —
+ * paging through a genre is a legitimate thing to want, and the ranked sort is
+ * computed per query either way, so a deep page costs about what the first one does.
  */
-export const MAX_RESULTS = 100;
+export const MAX_PAGE_SIZE = 100;
+
+/**
+ * A sanity bound on `skip`, not a product limit.
+ *
+ * It exists so absurd input is rejected with a 400 rather than handed to Postgres as
+ * an enormous OFFSET; the catalogue is ~31k films, so nothing a viewer does comes near
+ * it.
+ */
+export const MAX_SKIP = 1_000_000;
 
 export const StructuralSearchRequestSchema = z.object({
   query: z.string().min(1).optional(),
@@ -44,9 +52,9 @@ export const StructuralSearchRequestSchema = z.object({
     .min(0)
     // Expressed as "the window", not "<=99": the default zod message for an
     // off-by-one bound reads like a bug report rather than a product rule.
-    .max(MAX_RESULTS - 1, { message: `Pagination is capped at the first ${MAX_RESULTS} results` })
+    .max(MAX_SKIP, { message: `Pagination is capped at ${MAX_SKIP.toLocaleString()} results` })
     .default(0),
-  limit: z.number().int().min(1).max(100).default(10),
+  limit: z.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
 });
 export type StructuralSearchRequest = z.infer<typeof StructuralSearchRequestSchema>;
 
@@ -57,9 +65,9 @@ export const SemanticSearchRequestSchema = z.object({
     .min(0)
     // Expressed as "the window", not "<=99": the default zod message for an
     // off-by-one bound reads like a bug report rather than a product rule.
-    .max(MAX_RESULTS - 1, { message: `Pagination is capped at the first ${MAX_RESULTS} results` })
+    .max(MAX_SKIP, { message: `Pagination is capped at ${MAX_SKIP.toLocaleString()} results` })
     .default(0),
-  limit: z.number().int().min(1).max(100).default(10),
+  limit: z.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
 });
 export type SemanticSearchRequest = z.infer<typeof SemanticSearchRequestSchema>;
 
@@ -78,9 +86,9 @@ export const HybridSearchRequestSchema = z.object({
     .min(0)
     // Expressed as "the window", not "<=99": the default zod message for an
     // off-by-one bound reads like a bug report rather than a product rule.
-    .max(MAX_RESULTS - 1, { message: `Pagination is capped at the first ${MAX_RESULTS} results` })
+    .max(MAX_SKIP, { message: `Pagination is capped at ${MAX_SKIP.toLocaleString()} results` })
     .default(0),
-  limit: z.number().int().min(1).max(100).default(10),
+  limit: z.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
 });
 export type HybridSearchRequest = z.infer<typeof HybridSearchRequestSchema>;
 

@@ -19,9 +19,6 @@ vi.mock('../api/movies', () => ({
     getLanguages: vi.fn(),
     semanticSearch: vi.fn(),
     hybridSearch: vi.fn(),
-    // The page imports this constant; a mocked module has to re-export it or the
-    // import resolves to undefined and every cap assertion silently changes.
-    MAX_RESULTS: 100,
 }));
 
 const emptyPage = { results: [], total: 0, skip: 0, limit: 30, has_more: false };
@@ -103,55 +100,41 @@ describe('SearchPage caps results at the top 100', () => {
         expect(first.skip ?? 0).toBe(0);
     });
 
-    it('reports the capped total rather than "30,749 matches"', async () => {
+    it('reports the real total, not a capped one', async () => {
         renderAt('/search?mode=structural&genre=Drama');
-        await waitFor(() => expect(screen.getByText(/top 100 of 30,749 matches/i)).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText(/^30,749 matches$/)).toBeInTheDocument());
     });
 
-    it('reports the real total when it is under the cap', async () => {
-        vi.mocked(searchMovies).mockImplementation(async () => ({
-            results: pageOf(0),
-            total: 42,
-            skip: 0,
-            limit: 20,
-            has_more: true,
-        }));
-        renderAt('/search?mode=structural&genre=Drama');
-        await waitFor(() => expect(screen.getByText(/^42 matches$/)).toBeInTheDocument());
-    });
-
-    it('counts "more" against the cap, not the catalogue', async () => {
+    it('counts "more" against the total, not a window', async () => {
         renderAt('/search?mode=structural&genre=Drama');
         await waitFor(() => expect(screen.getByRole('button', { name: /show more/i })).toBeInTheDocument());
-        expect(screen.getByRole('button', { name: /show more/i })).toHaveTextContent('Show more (80 more)');
+        expect(screen.getByRole('button', { name: /show more/i })).toHaveTextContent('Show more (30,729 more)');
     });
 
-    it('stops at 100 and never requests beyond the cap', async () => {
+    it('keeps loading past 100, because depth is not capped', async () => {
+        // The server bounds a page's size, never how deep you may go. Search used to
+        // stop at "Top 100 of 30,749", which made the number in the header a lie.
         const user = userEvent.setup();
         renderAt('/search?mode=structural&genre=Drama');
         await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(20));
 
-        // Four more pages: 40, 60, 80, 100.
-        for (let expected = 40; expected <= 100; expected += 20) {
+        for (let expected = 40; expected <= 120; expected += 20) {
             await user.click(screen.getByRole('button', { name: /show more/i }));
             await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(expected));
         }
 
-        // The offer is gone, and no request ever reached past the window.
-        expect(screen.queryByRole('button', { name: /show more/i })).toBeNull();
-        for (const [params] of searchMovies.mock.calls) {
-            expect((params.skip ?? 0) + (params.limit ?? 0)).toBeLessThanOrEqual(100);
-        }
+        // 120 cards means a request at skip=100 went through and returned rows.
+        const skips = searchMovies.mock.calls.map(([params]) => params.skip ?? 0);
+        expect(skips).toContain(100);
+        expect(Math.max(...skips)).toBeGreaterThanOrEqual(100);
     });
 
-    it('does not overshoot the cap on the final page', async () => {
-        // A total just inside the cap: the last request must ask for the
-        // remainder, not a full page past the end.
+    it('asks for the remainder on the final page, not a full page past the end', async () => {
         vi.mocked(searchMovies).mockImplementation(async (params = {}) => {
             const skip = params.skip ?? 0;
             return {
-                results: pageOf(skip).slice(0, Math.max(0, Math.min(20, 100 - skip))),
-                total: 100,
+                results: pageOf(skip).slice(0, Math.max(0, Math.min(20, 90 - skip))),
+                total: 90,
                 skip,
                 limit: params.limit ?? 20,
                 has_more: true,
@@ -163,7 +146,6 @@ describe('SearchPage caps results at the top 100', () => {
 
         await user.click(screen.getByRole('button', { name: /show more/i }));
         await waitFor(() => expect(document.querySelectorAll('.movie-card')).toHaveLength(40));
-        // 100 - 40 = 60 remaining, so pages continue 20 at a time to exactly 100.
         expect(searchMovies.mock.calls.at(-1)[0]).toMatchObject({ limit: 20, skip: 20 });
     });
 });

@@ -149,10 +149,11 @@ own query altogether.
 | GET | `/flicks/movie/:id/providers` | Where to watch (per-region Stream/Rent/Buy), cached in the DB |
 | GET | `/search/stats` | Rating/runtime extents, count |
 
-Pagination is capped at the **first 100 results** (`MAX_RESULTS`) for every
-search mode: `limit` is at most 100, and a `skip` landing outside that window is
-rejected with 400 rather than serving a 30k-deep page. The UI pages 20 at a time
-and stops at 100.
+Pagination bounds a page's **size**, not its **depth**. `MAX_PAGE_SIZE` (100) caps
+`limit` so that `limit=100000` cannot pull the whole table in one response;
+`skip` is unconstrained in practice (`MAX_SKIP` only rejects absurd offsets) because
+paging deep into a genre is legitimate and the ranked sort is computed per query
+either way. The UI pages 20 at a time and can walk the entire result set.
 | POST | `/chat` | SSE agent chat `{ message, history? }` |
 
 ## Tests

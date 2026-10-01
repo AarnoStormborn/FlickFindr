@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { logger } from "../logger.js";
+import { MAX_PAGE_SIZE, MAX_SKIP } from "../models.js";
 import type { MovieResult, Queryable } from "../models.js";
 import { MOVIE_COLUMNS, toMovieResult } from "../services/structural.js";
 import { WEIGHTED_RATING_SQL } from "../services/rating.js";
@@ -16,13 +17,15 @@ interface FlicksDeps {
  * passed through `Number()`. Without bounds, `?limit=100000` returned the whole
  * catalogue in one response (30,749 rows) and malformed values reached Postgres
  * and surfaced as 500s: `?skip=abc`, `?limit=-5` and `/flicks/movie/abc`.
+ *
+ * The page size bound is the security-relevant one; the `skip` bound is only there
+ * to keep absurd offsets out of Postgres (see MAX_SKIP in models.ts).
  */
-const MAX_PAGE_SIZE = 100;
 /** Postgres int4 upper bound — larger ids cannot exist, and must not be queried. */
 const MAX_MOVIE_ID = 2_147_483_647;
 
 const ListQuerySchema = z.object({
-  skip: z.coerce.number().int().min(0).default(0),
+  skip: z.coerce.number().int().min(0).max(MAX_SKIP).default(0),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
 });
 

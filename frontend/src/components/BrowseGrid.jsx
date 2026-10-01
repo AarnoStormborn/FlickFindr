@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MovieCard from './MovieCard';
-import { searchMovies, MAX_RESULTS } from '../api/movies';
+import { searchMovies } from '../api/movies';
 import LoadingQuips from './LoadingQuips';
 
 const MOVIES_PER_PAGE = 20;
@@ -77,11 +77,11 @@ export default function BrowseGrid({
         setPage(0);
     };
 
-    // The API refuses a skip beyond MAX_RESULTS, so the UI must not offer pages
-    // it cannot fetch. A genre with 13,540 films still shows only the first 100,
-    // and paging is capped to match instead of failing on page 6.
-    const reachable = Math.min(total, MAX_RESULTS);
-    const totalPages = Math.ceil(reachable / MOVIES_PER_PAGE);
+    // Depth is the server's business now: a page *size* is capped, a page *offset*
+    // is not, so a genre with 13,540 films really does have 677 pages. The ranked
+    // sort is computed per query either way, so a deep page costs the same as the
+    // first one.
+    const totalPages = Math.ceil(total / MOVIES_PER_PAGE);
 
     return (
         <>
@@ -89,9 +89,7 @@ export default function BrowseGrid({
                 <h1 className="genre-title">{title}</h1>
                 <p className="genre-count">
                     {subtitle ? `${subtitle} · ` : ''}
-                    {total > MAX_RESULTS
-                        ? `Top ${MAX_RESULTS} of ${total.toLocaleString()} ${countLabel}`
-                        : `${total.toLocaleString()} ${countLabel}`}
+                    {total.toLocaleString()} {countLabel}
                 </p>
             </header>
 
