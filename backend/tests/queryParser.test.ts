@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lastAssistantText, parseJsonObject, parseSearchQuery } from "../src/agent/queryParser.js";
+import { lastAssistantText, parseJsonObject, parseSearchQuery, resolveAgentReply } from "../src/agent/queryParser.js";
 import { budgetSnapshot, resetBudget, tryConsume } from "../src/services/llmBudget.js";
 
 /**
@@ -111,6 +111,52 @@ describe("parseJsonObject", () => {
   });
 });
 
+describe("resolveAgentReply", () => {
+  it.each([
+    {
+      name: "genre and rating",
+      query: "a heist film with a twist",
+      filters: { genre: "Crime", min_rating: 7 },
+    },
+    {
+      name: "cast and runtime",
+      query: "a detective looking for her sister",
+      filters: { stars: "Viola Davis", max_runtime: 120 },
+    },
+    {
+      name: "director and rating ceiling",
+      query: "a family on a cross-country road trip",
+      filters: { directors: "Greta Gerwig", max_rating: 8 },
+    },
+    {
+      name: "no filters",
+      query: "a mystery set in a seaside village",
+      filters: {},
+    },
+  ])("accepts an unchanged plot query with $name", ({ query, filters }) => {
+    const reply = JSON.stringify({ query, ...filters });
+    expect(resolveAgentReply(query, reply)).toEqual({
+      parsed: true,
+      request: { query, ...filters, skip: 0, limit: 10 },
+    });
+  });
+
+  it("accepts a rewritten plot query with filters", () => {
+    const reply = JSON.stringify({ query: "a crew steals from a casino", genre: "Crime" });
+    expect(resolveAgentReply("a casino heist", reply)).toEqual({
+      parsed: true,
+      request: { query: "a crew steals from a casino", genre: "Crime", skip: 0, limit: 10 },
+    });
+  });
+
+  it("rejects a blank plot query", () => {
+    expect(resolveAgentReply("crime film", '{"query":"   ","genre":"Crime"}')).toEqual({
+      parsed: false,
+      request: { query: "crime film", skip: 0, limit: 10 },
+    });
+  });
+});
+
 describe("parseSearchQuery fallbacks", () => {
   it("returns the raw query untouched when the input is blank", async () => {
     const res = await parseSearchQuery("   ");
@@ -136,4 +182,26 @@ describe("parseSearchQuery without budget", () => {
     expect(result).toEqual({ query: "a heist film with a twist", skip: 0, limit: 10 });
     resetBudget();
   });
+});
+
+/**
+ * Caching is now keyed on "the model answered", not "the answer differs from the
+ * input". This is the half of that rule a test can reach without a live model: a
+ * parse that *failed* must not be cached, or a transient outage would be remembered
+ * for the cache TTL. (The other half — an unchanged answer being cached — is verified
+ * against the running service, since it requires a real model reply.)
+ */
+describe("parse cache only remembers real answers", () => {
+  it("does not cache a failed parse", async () => {
+    resetBudget();
+    const before = budgetSnapshot().used;
+    // No provider credentials in the test environment, so this fails fast and falls
+    // back. Both calls must reach the model, which is how we observe "not cached".
+    const first = await parseSearchQuery("a film about a lighthouse keeper we have never asked about");
+    const second = await parseSearchQuery("a film about a lighthouse keeper we have never asked about");
+    expect(first.query).toBe("a film about a lighthouse keeper we have never asked about");
+    expect(second.query).toBe(first.query);
+    expect(budgetSnapshot().used - before).toBe(2);
+    resetBudget();
+  }, 30_000);
 });

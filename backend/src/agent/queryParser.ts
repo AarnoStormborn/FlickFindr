@@ -98,6 +98,16 @@ export function parseJsonObject(raw: string): HybridSearchRequest | undefined {
   }
 }
 
+/** Preserve model filters even when its plot query is identical to the input. */
+export function resolveAgentReply(
+  rawQuery: string,
+  reply: string,
+): { request: HybridSearchRequest; parsed: boolean } {
+  const parsed = parseJsonObject(reply);
+  if (parsed?.query.trim()) return { request: parsed, parsed: true };
+  return { request: { query: rawQuery, skip: 0, limit: 10 }, parsed: false };
+}
+
 /** Build a minimal resource loader (no extensions/skills/prompts from disk). */
 async function minimalLoader(): Promise<DefaultResourceLoader> {
   const loader = new DefaultResourceLoader({
@@ -131,21 +141,29 @@ export async function parseSearchQuery(rawQuery: string): Promise<HybridSearchRe
   if (!tryConsume()) {
     return { query: rawQuery, skip: 0, limit: 10 };
   }
-  const result = await parseSearchQueryImpl(rawQuery);
-  // only cache successful (non-fallback, parsed) results
-  if (result.query.trim() && result.query !== rawQuery.trim()) {
-    parseCache.set(key, { value: result, ts: Date.now() });
+  const { request, parsed } = await parseSearchQueryImpl(rawQuery);
+  // Cache whenever the model actually answered — including when it kept the user's
+  // wording. The old condition also required the text to have changed, which was
+  // fine while the prompt rewrote everything, but the prompt now *asks* it to
+  // preserve concrete detail (30 of 38 eval rewrites come back identical), so those
+  // searches were re-calling the model on every repeat, spending budget and latency
+  // for an answer already known. A failed or unusable parse is still not cached.
+  if (parsed) {
+    parseCache.set(key, { value: request, ts: Date.now() });
     if (parseCache.size > 200) {
       const oldest = parseCache.keys().next().value;
       if (oldest !== undefined) parseCache.delete(oldest);
     }
   }
-  return result;
+  return request;
 }
 
-async function parseSearchQueryImpl(rawQuery: string): Promise<HybridSearchRequest> {
+async function parseSearchQueryImpl(
+  rawQuery: string,
+): Promise<{ request: HybridSearchRequest; parsed: boolean }> {
   const fallback: HybridSearchRequest = { query: rawQuery, skip: 0, limit: 10 };
-  if (!config.agent.enabled || !rawQuery.trim()) return fallback;
+  const unusable = { request: fallback, parsed: false };
+  if (!config.agent.enabled || !rawQuery.trim()) return unusable;
 
   let session: Awaited<ReturnType<typeof createAgentSession>> | undefined;
   const timer = setTimeout(() => {
@@ -170,18 +188,17 @@ async function parseSearchQueryImpl(rawQuery: string): Promise<HybridSearchReque
 
     await session.session.prompt(`${PARSE_PROMPT}\n\nUser query: "${rawQuery}"`);
     const text = lastAssistantText(session.session.messages);
-    const parsed = text ? parseJsonObject(text) : undefined;
+    const resolved = resolveAgentReply(rawQuery, text ?? "");
 
-    // Require a non-empty, non-identical query to consider the parse successful.
-    if (parsed && parsed.query.trim() && parsed.query !== rawQuery) {
-      logger.info({ parsed }, "Agent parsed query");
-      return parsed;
+    if (resolved.parsed) {
+      logger.info({ parsed: resolved.request }, "Agent parsed query");
+      return resolved;
     }
     logger.warn({ text }, "Agent parse unusable; falling back to raw query");
-    return fallback;
+    return resolved;
   } catch (err) {
     logger.error({ err }, "Agent query parsing failed; falling back to raw query");
-    return fallback;
+    return unusable;
   } finally {
     clearTimeout(timer);
     session?.session.dispose();
