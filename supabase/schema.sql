@@ -23,6 +23,17 @@ create table if not exists movies (
   -- Second vector for the same query: title + genres + keywords. Kept apart from
   -- plot_embedding because keywords blended into the plot document displace it.
   keywords_embedding vector(384),
+  -- Third-party ratings (IMDb / RT / Metacritic) from OMDb, fetched on demand and
+  -- cached. ratings_checked records "we asked"; a failure is never stored.
+  external_ratings jsonb,
+  ratings_checked boolean not null default false,
+  ratings_updated_at timestamptz,
+  -- Third-party ratings (IMDb / Rotten Tomatoes / Metacritic) from OMDb, cached on
+  -- demand: the free tier is 1,000 requests/day, so a catalogue backfill is not an
+  -- option and only films somebody opens are fetched.
+  external_ratings jsonb,
+  ratings_checked boolean not null default false,
+  ratings_updated_at timestamptz,
   genre text,
   metascore float,
   plot text,

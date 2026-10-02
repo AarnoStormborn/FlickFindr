@@ -43,6 +43,11 @@ async function main(): Promise<void> {
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS watch_providers JSONB");
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS providers_checked BOOLEAN NOT NULL DEFAULT false");
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS providers_updated_at TIMESTAMPTZ");
+    // Third-party ratings (IMDb/RT/Metacritic) via OMDb, fetched on demand and cached.
+    // Same contract as providers: "we asked" is recorded, a failure is not.
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS external_ratings JSONB");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS ratings_checked BOOLEAN NOT NULL DEFAULT false");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS ratings_updated_at TIMESTAMPTZ");
     // "We asked TMDB" for a runtime, kept separate from the value itself. The
     // first attempt at this backfill wrote runtime = 0 for films TMDB had no
     // runtime for, which is indistinguishable from a real 0-minute film and made
@@ -58,6 +63,12 @@ async function main(): Promise<void> {
     // time. Kept separate because blending keywords *into* the plot document
     // displaces it: measured, that gained six queries and lost six.
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS keywords_embedding vector(384)");
+    // Third-party ratings (IMDb/RT/Metacritic) via OMDb, fetched on demand and cached.
+    // Same contract as watch_providers: `ratings_checked` records "we asked", so a
+    // transient failure is never stored as "this film has no ratings".
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS external_ratings JSONB");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS ratings_checked BOOLEAN NOT NULL DEFAULT false");
+    await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS ratings_updated_at TIMESTAMPTZ");
     // Plain unique index (NULLs allowed — they are distinct), so
     // ON CONFLICT (tmdb_id) resolves. Replaces any older partial index.
     await pool.query("DROP INDEX IF EXISTS idx_movies_tmdb_id");

@@ -1,0 +1,67 @@
+/* Third-party ratings: a quiet row of score chips near the film's own metadata.
+   Deliberately small — these are supporting evidence, not the headline. */
+.ratings {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    list-style: none;
+    margin: var(--space-md) 0 0;
+    padding: 0;
+}
+
+.ratings-item {
+    border: 1px solid var(--line-subtle);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+.ratings-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+a.ratings-link:hover {
+    background: var(--bg-hover);
+}
+
+.ratings-source {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+
+.ratings-score {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* The one source we link out to gets a hint that it is clickable. */
+a.ratings-link:hover .ratings-source {
+    color: var(--text-secondary);
+}
+
+.ratings-imdb .ratings-score {
+    color: #d9a441;
+}
+
+.ratings-rotten_tomatoes .ratings-score {
+    color: #e06c5a;
+}
+
+.ratings-metacritic .ratings-score {
+    color: #7fbf7f;
+}
+
+/* Attribution for the source of these numbers, kept quieter than the scores. */
+.ratings-source-note {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+}

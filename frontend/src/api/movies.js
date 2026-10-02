@@ -103,6 +103,20 @@ export async function getWatchProviders(id) {
 }
 
 /**
+ * Third-party ratings (IMDb / Rotten Tomatoes / Metacritic) for one film.
+ *
+ * Not cached in the client: the server caches it in the database, and a stale
+ * browser cache would hide a newly fetched score. `ratings` may legitimately be
+ * null (the film has none), which is different from a failed request.
+ */
+export async function getRatings(id) {
+    return fetchJson(`${API_BASE_URL}/flicks/movie/${id}/ratings`).then((d) => {
+        if (!d || typeof d !== 'object') throw new Error('Failed to fetch ratings');
+        return d;
+    });
+}
+
+/**
  * Fetch the language facet (TMDB codes + counts, most common first).
  */
 export async function getLanguages() {
