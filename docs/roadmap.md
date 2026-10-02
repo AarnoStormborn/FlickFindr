@@ -294,7 +294,16 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
 
 ## Backlog / nice-to-haves
 
-- **Reviews** — third-party ratings/reviews on the detail page (table stakes).
+- **Reviews — *third-party ratings shipped, review text not*.** The detail page shows
+  IMDb, Rotten Tomatoes and Metacritic scores from OMDb, fetched on first visit and
+  cached (`external_ratings` + `ratings_checked`, the same contract as watch providers:
+  a failure is never stored as "this film has no ratings"). Not backfilled, because the
+  free tier is 1,000 requests/day, so only films somebody opens cost a request.
+  **Needs `OMDB_API_KEY`** in the backend environment — without it the endpoint says so
+  with a 503 and the strip stays invisible. TMDB review *text* was considered and
+  skipped: the quality is uneven (Shawshank's most recent review reads "very good movie
+  9.5/10"), and a bad one-liner beside a film looks worse than showing nothing. User-written
+  reviews would need accounts, which is the next item.
 - **Accounts + cloud sync** — move lists/history from localStorage to per-user
   storage once multi-device use matters (the concierge transcript would move
   with it).
