@@ -6,6 +6,7 @@ import AddToListButton from '../components/AddToListButton';
 import { languageName } from '../lib/languages';
 import { formatMoney } from '../lib/format';
 import WhereToWatch from '../components/WhereToWatch';
+import Ratings from '../components/Ratings';
 import { useListsContext } from '../context/useListsContext';
 import './MovieDetailsPage.css';
 import LoadingQuips from '../components/LoadingQuips';
@@ -151,6 +152,11 @@ export default function MovieDetailsPage() {
                                 </div>
                             )}
                         </div>
+
+                        {/* Third-party scores (IMDb / RT / Metacritic), fetched on
+                            demand and cached server-side. Renders nothing when the
+                            film has none, so it never leaves an empty gap. */}
+                        <Ratings movieId={movie.id} />
 
                         {/* Body: content on the left, "where to watch" beside it */}
                         <div className="movie-body">

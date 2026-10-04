@@ -123,6 +123,30 @@ async function tmdbGet<T>(path: string, params: Record<string, string>, attempts
 }
 
 /**
+ * The film's IMDb id, which is how third-party ratings are looked up.
+ *
+ * OMDb is keyed by `imdb_id`, not by title — "Titanic" matches a 1953, a 1997 and a
+ * 2010 film — so this is the join between the two providers.
+ *
+ * Returns { ok, missing, imdbId }: ok=false means TMDB was unreachable (do not record),
+ * missing=true means TMDB says the film does not exist.
+ */
+export async function getExternalIds(
+  tmdbId: number,
+  attempts = 1,
+): Promise<{ ok: boolean; missing: boolean; imdbId: string | null }> {
+  const { data, status } = await tmdbGet<{ imdb_id?: string | null }>(
+    `/movie/${tmdbId}/external_ids`,
+    {},
+    attempts,
+  );
+  if (data === null) return { ok: false, missing: status === 404, imdbId: null };
+  const imdbId = data.imdb_id ? String(data.imdb_id) : null;
+  // Reachable, but no IMDb id on file: a definitive answer for our purposes.
+  return { ok: true, missing: false, imdbId };
+}
+
+/**
  * TMDB keyword names for a film, comma-joined.
  *
  * These matter because TMDB's overview is a spoiler-free marketing blurb: The

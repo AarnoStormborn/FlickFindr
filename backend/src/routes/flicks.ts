@@ -6,7 +6,8 @@ import type { MovieResult, Queryable } from "../models.js";
 import { MOVIE_COLUMNS, toMovieResult } from "../services/structural.js";
 import { WEIGHTED_RATING_SQL } from "../services/rating.js";
 import { semanticService } from "../services/semantic.js";
-import { getMovieVideos, getWatchProviders } from "../tmdb.js";
+import { getExternalIds, getMovieVideos, getWatchProviders } from "../tmdb.js";
+import { getRatingsByImdbId, omdbConfigured } from "../omdb.js";
 
 interface FlicksDeps {
   db: Queryable;
@@ -216,6 +217,81 @@ export function flicksRoutes(app: FastifyInstance, deps: FlicksDeps): void {
       return payload(regions);
     } catch (err) {
       logger.error({ err }, "Error fetching watch providers");
+      return reply.code(500).send({ detail: "Internal Server Error" });
+    }
+  });
+
+  /**
+   * Third-party ratings (IMDb / Rotten Tomatoes / Metacritic), fetched on first visit
+   * and cached — OMDb's free tier is 1,000 requests/day, so the catalogue is never
+   * backfilled and only films somebody actually opens cost anything.
+   *
+   * Same contract as providers: `ratings_checked` records "we asked", a transient
+   * failure is a 503 and is *not* recorded, and a film with no ratings at all is a
+   * 200 with `ratings: null` so the UI can stay quiet instead of erroring.
+   */
+  app.get("/flicks/movie/:movie_id/ratings", async (request, reply) => {
+    const parsedParams = MovieIdParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) return invalid(reply, parsedParams.error);
+    const movieId = parsedParams.data.movie_id;
+
+    const payload = (ratings: unknown) => ({
+      ratings: ratings ?? null,
+      attribution: {
+        text: "Ratings from IMDb, Rotten Tomatoes and Metacritic, via OMDb",
+        url: "https://www.omdbapi.com",
+      },
+    });
+    const recordChecked = (ratings: unknown) =>
+      db.query(
+        "UPDATE movies SET external_ratings = $1, ratings_checked = true, ratings_updated_at = now() WHERE id = $2",
+        [ratings === null ? null : JSON.stringify(ratings), movieId],
+      );
+
+    try {
+      const { rows } = await db.query(
+        "SELECT tmdb_id, external_ratings, ratings_checked FROM movies WHERE id = $1",
+        [movieId],
+      );
+      const row = rows[0];
+      if (!row) return reply.code(404).send({ detail: `Movie not found for ID: ${movieId}` });
+
+      // 1. Already asked -> serve the stored answer (possibly "none").
+      if (row.ratings_checked) return payload(row.external_ratings);
+
+      // 2. Not configured: say so rather than pretending the film has no ratings.
+      if (!omdbConfigured()) {
+        return reply.code(503).send({ detail: "Third-party ratings are not configured on this server" });
+      }
+
+      const tmdbId = Number(row.tmdb_id ?? 0);
+      if (!tmdbId) {
+        await recordChecked(null);
+        return payload(null);
+      }
+
+      // 3. First visit: TMDB tells us the IMDb id (OMDb is keyed by that, not title).
+      const ids = await getExternalIds(tmdbId, 4);
+      if (!ids.ok) return reply.code(503).send({ detail: "Ratings service unavailable, try again" });
+      if (!ids.imdbId) {
+        await recordChecked(null);
+        return payload(null);
+      }
+
+      const found = await getRatingsByImdbId(ids.imdbId, 4);
+      if (!found.ok) {
+        if (found.missing) {
+          await recordChecked(null);
+          return payload(null);
+        }
+        return reply.code(503).send({ detail: "Ratings service unavailable, try again" });
+      }
+
+      await recordChecked(found.ratings);
+      logger.info({ movieId, imdbId: ids.imdbId }, "External ratings fetched");
+      return payload(found.ratings);
+    } catch (err) {
+      logger.error({ err }, "Error fetching external ratings");
       return reply.code(500).send({ detail: "Internal Server Error" });
     }
   });

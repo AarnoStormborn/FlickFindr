@@ -33,6 +33,8 @@ export const EXPECTED_COLUMNS = [
   "runtime_checked",
   "watch_providers",
   "providers_checked",
+  "external_ratings",
+  "ratings_checked",
 ] as const;
 
 /**

@@ -194,6 +194,14 @@ Re-run the sweep by querying for nulls and out-of-range values per column
   catalogue change, compare that endpoint against `SELECT DISTINCT original_language`
   — the other differences (Bangla/Bengali, Māori/Maori, Ossetic/Ossetian) are the same
   language under two names and need no fix.
+- **Third-party ratings need `OMDB_API_KEY`.** The detail page's IMDb / Rotten
+  Tomatoes / Metacritic scores come from OMDb (free tier: 1,000 requests/day,
+  non-commercial, https://www.omdbapi.com/apikey.aspx). Without the key the endpoint
+  answers `503 Third-party ratings are not configured on this server` and the UI stays
+  invisible — deliberately distinct from "this film has no ratings", which is a 200
+  with a null payload. Lookups are by `imdb_id` from TMDB's `/external_ids` (titles are
+  ambiguous), and the 401 path is treated as transient: the row stays unchecked so it
+  retries once the key or quota is sorted.
 - **Box office (`gross`) is absent for most obscure films, and that is the data,
   not a bug.** Coverage is 43.7% overall, but **89.9%** of films with 1,000+ votes
   and **99.5%** of those with 10,000+. TMDB has no revenue for the long tail, so
