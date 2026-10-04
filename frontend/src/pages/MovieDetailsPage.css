@@ -479,24 +479,37 @@
     min-width: 0;
 }
 
+/* The divider belongs to the sidebar, and only exists when the sidebar has
+   something to divide. A provider lookup that fails renders the sidebar empty, and
+   the rule and its padding were still drawn — a stray horizontal line with 49px of
+   space above it and nothing under it. */
 .movie-body-aside {
-    border-left: 1px solid var(--line-subtle);
-    padding-left: var(--space-xl);
     min-width: 0;
 }
 
-/* Below the breakpoint the columns stack, and the same single hairline moves
-   to the top of the sidebar rather than becoming a second one. */
+.movie-body-aside:not(:empty) {
+    border-left: 1px solid var(--line-subtle);
+    padding-left: var(--space-xl);
+}
+
+/* Below the breakpoint the columns stack, and the same single hairline moves to the
+   top of the sidebar rather than becoming a second one. */
 @media (max-width: 900px) {
     .movie-body {
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-lg);
+        /* No grid gap here: the break's spacing belongs to the sidebar rule below,
+           and having both meant 24px + 24px — 49px of air against a page rhythm of
+           16-32px. One owner, split evenly around the line. */
+        gap: 0;
     }
 
-    .movie-body-aside {
+    .movie-body-aside:not(:empty) {
         border-left: 0;
         padding-left: 0;
-        padding-top: var(--space-lg);
+        /* Fluid, so the break keeps pace with the viewport instead of being a fixed
+           value that is too much on a phone and too little on a tablet. */
+        margin-top: clamp(0.75rem, 4vw, 1rem);
+        padding-top: clamp(0.75rem, 4vw, 1rem);
         border-top: 1px solid var(--line-subtle);
     }
 }
