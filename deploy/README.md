@@ -46,6 +46,9 @@ Browser
    - `RATE_LIMIT_MAX` / `CHAT_RATE_LIMIT_MAX` — optional per-IP ceilings (default
      120/min and 8/min). The API is public and /chat costs money per turn.
    - `TMDB_API_KEY` — optional (only if ingest runs here)
+   - `SUPABASE_URL` and `SUPABASE_ANON_KEY` — required for Supabase Auth token
+     verification on account-sync endpoints. The anon key is public; never use the
+     `service_role` key here or in the frontend.
 4. Deploy. Render auto-deploys on every push to `main` (backend changes).
 
 > Free tier spins down after 15 min idle → the first request after idle takes
@@ -59,7 +62,34 @@ Browser
 > Rebuilding or repairing the database, and verifying it afterwards:
 > [`docs/runbook.md`](../docs/runbook.md) (`npm run check --strict`).
 
-## 3. Vercel (frontend)
+## 3. Accounts + cloud sync (Supabase Auth)
+
+Accounts are optional: film discovery and guest/local mode work without them. To
+turn on magic-link sign-in and sync lists, search history and the concierge transcript:
+
+1. In Supabase → **Authentication → URL Configuration**, set the Site URL to the
+   production frontend (`https://flick-findr-zeta.vercel.app`) and allow that URL's
+   `/account` path plus `http://localhost:5173/account` for local development. Add
+   Vercel preview URLs if you want to test auth on previews.
+2. Copy the project URL and the **anon / publishable** key (not `service_role`). Set
+   them in Render as `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
+3. Set the same values in Vercel as `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY`, then redeploy the frontend — Vite embeds these at build
+   time. Put the local values in `frontend/.env.local` and `backend/.env`.
+4. Run `DATABASE_URL=<supabase-url> npm run init:db` in `backend/` to create the
+   user-sync table and its RLS owner policy. If the developer machine cannot reach the
+   Supabase pooler, use **Actions → Migrate Supabase schema** and enter `MIGRATE
+   PRODUCTION`; it runs the same idempotent migration using the repository's
+   `SUPABASE_DATABASE_URL` secret. The authenticated API additionally scopes every
+   query to the verified token's user id.
+5. Test: `/account` → email magic link → open email → back to `/account`; guest lists,
+   history and transcript merge into the account. The Account page shows sync status.
+
+If the Supabase Auth email provider is still on its default low rate limit, configure
+SMTP before inviting broad use. The sync data is private to the user and is never read
+from the browser by a service-role key.
+
+## 4. Vercel (frontend)
 
 1. In Vercel: **Add New Project** → import repo → **Root Directory: `frontend`**.
    (Framework auto-detects Vite.)
@@ -69,7 +99,7 @@ Browser
 
 > `VITE_API_URL` is baked in at build time. Changing it = redeploy.
 
-## 4. Load the catalog (S3 parquet → Supabase)
+## 5. Load the catalog (S3 parquet → Supabase)
 
 From your laptop (or anywhere with AWS creds + the repo):
 
@@ -92,7 +122,7 @@ DATABASE_URL="<supabase-connection-string>" npm run embeddings
 > **direct** connection (`:5432`) for one-shot loaders/`psql`, and the pooled
 > one for the app if needed. TLS is required; both tools use it.
 
-## 5. Day-2 notes
+## 6. Day-2 notes
 
 - **Cold starts:** keep Render warm with a free pinger, or pay ~$7/mo to
   disable spin-down (not needed for hobby).

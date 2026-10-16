@@ -28,12 +28,6 @@ create table if not exists movies (
   external_ratings jsonb,
   ratings_checked boolean not null default false,
   ratings_updated_at timestamptz,
-  -- Third-party ratings (IMDb / Rotten Tomatoes / Metacritic) from OMDb, cached on
-  -- demand: the free tier is 1,000 requests/day, so a catalogue backfill is not an
-  -- option and only films somebody opens are fetched.
-  external_ratings jsonb,
-  ratings_checked boolean not null default false,
-  ratings_updated_at timestamptz,
   genre text,
   metascore float,
   plot text,
@@ -66,6 +60,23 @@ create unique index if not exists idx_movies_tmdb_id on movies (tmdb_id);
 create index if not exists idx_movies_name on movies (movie_name);
 -- Language is a common filter combined with sort-by-rating, so index it.
 create index if not exists idx_movies_language on movies (original_language);
+
+-- Local-first account sync: one bounded snapshot per Supabase Auth user. The API
+-- verifies the bearer token and always queries by that authenticated user id; RLS
+-- is a second line of defence for any future direct client access.
+create table if not exists user_sync_data (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  data jsonb not null,
+  revision bigint not null default 1,
+  updated_at timestamptz not null default now()
+);
+
+alter table user_sync_data enable row level security;
+drop policy if exists user_sync_data_owner on user_sync_data;
+create policy user_sync_data_owner on user_sync_data
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+grant select, insert, update, delete on user_sync_data to authenticated;
 
 -- Optional but recommended for vector search speed at 30k rows.
 create index if not exists idx_movies_embedding

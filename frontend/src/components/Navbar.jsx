@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../context/authContext';
 import './Navbar.css';
 
 export default function Navbar() {
+    const { user, configured } = useAuth();
     const activeClass = ({ isActive }) => (isActive ? 'navbar-link active' : 'navbar-link');
     return (
         <nav className="navbar">
@@ -37,6 +39,11 @@ export default function Navbar() {
 
                 {/* Right Side - Search button (icon) */}
                 <div className="navbar-actions">
+                    {configured && (
+                        <NavLink to="/account" className="navbar-account-link">
+                            {user ? 'Account' : 'Sign in'}
+                        </NavLink>
+                    )}
                     <NavLink to="/search" className="navbar-search-btn" aria-label="Search">
                         <svg
                             width="20"

@@ -10,12 +10,17 @@ import { searchRoutes } from "./routes/search.js";
 import { chatRoutes } from "./routes/chat.js";
 import { isAgentConfigured } from "./agent/runtime.js";
 import { budgetSnapshot } from "./services/llmBudget.js";
+import { accountRoutes } from "./routes/account.js";
+import { supabaseAuthConfigured } from "./services/supabaseAuth.js";
+import type { verifySupabaseToken } from "./services/supabaseAuth.js";
 
 export interface AppDeps {
   db: Queryable;
   embed: (text: string) => Promise<number[]>;
   /** Override the agent query parser (tests inject a stub). */
   agentParse?: (query: string) => Promise<HybridSearchRequest>;
+  /** Override Supabase token verification in tests. */
+  authVerify?: typeof verifySupabaseToken;
 }
 
 /** Build the Fastify app with all routes. Injectable deps make it testable. */
@@ -59,11 +64,13 @@ export function buildApp(deps: AppDeps) {
       // without log-diving. Resets at midnight UTC.
       budget: budgetSnapshot(),
     },
+    accounts: { configured: supabaseAuthConfigured() },
   }));
 
   app.register(async (instance) => {
     flicksRoutes(instance, { db: deps.db });
     searchRoutes(instance, { db: deps.db, embed: deps.embed, agentParse: deps.agentParse });
+    accountRoutes(instance, deps.db, deps.authVerify);
     if (config.agent.enabled) {
       chatRoutes(instance, { db: deps.db, embed: deps.embed });
     }

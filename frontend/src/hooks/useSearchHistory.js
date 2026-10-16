@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
+import { HISTORY_KEY, LOCAL_SYNC_EVENT, notifyLocalSyncChange } from '../lib/localSync';
 
-const HISTORY_KEY = 'flickfindr-search-history';
+export { HISTORY_KEY };
 const MAX_ENTRIES = 25;
 
-function loadHistory() {
+export function loadHistory() {
     try {
         const raw = localStorage.getItem(HISTORY_KEY);
         if (!raw) return [];
@@ -18,6 +19,7 @@ function loadHistory() {
 function saveHistory(items) {
     try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+        notifyLocalSyncChange();
     } catch {
         /* storage full / unavailable — ignore */
     }
@@ -49,11 +51,19 @@ export default function useSearchHistory() {
 
     // Keep state in sync if another tab writes history.
     useEffect(() => {
+        const reload = () => setHistory(loadHistory());
         const onStorage = (e) => {
-            if (e.key === HISTORY_KEY) setHistory(loadHistory());
+            if (e.key === HISTORY_KEY) reload();
+        };
+        const onLocalSync = (e) => {
+            if (e.detail?.source === 'cloud') reload();
         };
         window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
+        window.addEventListener(LOCAL_SYNC_EVENT, onLocalSync);
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener(LOCAL_SYNC_EVENT, onLocalSync);
+        };
     }, []);
 
     return { history, recordSearch, clearHistory };

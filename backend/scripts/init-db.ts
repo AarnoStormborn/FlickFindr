@@ -48,6 +48,36 @@ async function main(): Promise<void> {
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS external_ratings JSONB");
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS ratings_checked BOOLEAN NOT NULL DEFAULT false");
     await pool.query("ALTER TABLE movies ADD COLUMN IF NOT EXISTS ratings_updated_at TIMESTAMPTZ");
+    // Per-user local-first sync snapshot for lists, search history and concierge
+    // transcript. `user_id` is always sourced from the verified Supabase token in the
+    // API, never from the request body. RLS policies are installed when running on
+    // Supabase; local Postgres has no auth.uid() function and uses the same explicit
+    // user_id predicate in the API instead.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sync_data (
+        user_id UUID PRIMARY KEY,
+        data JSONB NOT NULL,
+        revision BIGINT NOT NULL DEFAULT 1,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    await pool.query("ALTER TABLE user_sync_data ENABLE ROW LEVEL SECURITY");
+    await pool.query(`
+      DO $$ BEGIN
+        IF to_regclass('auth.users') IS NOT NULL THEN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+             WHERE conname = 'user_sync_data_user_id_fkey'
+               AND conrelid = 'user_sync_data'::regclass
+          ) THEN
+            EXECUTE 'ALTER TABLE user_sync_data ADD CONSTRAINT user_sync_data_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE';
+          END IF;
+          EXECUTE 'DROP POLICY IF EXISTS user_sync_data_owner ON user_sync_data';
+          EXECUTE 'CREATE POLICY user_sync_data_owner ON user_sync_data USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)';
+          EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON user_sync_data TO authenticated';
+        END IF;
+      END $$
+    `);
     // "We asked TMDB" for a runtime, kept separate from the value itself. The
     // first attempt at this backfill wrote runtime = 0 for films TMDB had no
     // runtime for, which is indistinguishable from a real 0-minute film and made

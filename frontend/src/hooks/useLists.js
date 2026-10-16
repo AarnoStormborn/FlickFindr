@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { LISTS_KEY, LOCAL_SYNC_EVENT } from '../lib/localSync';
 import {
     loadLists,
     movieSnapshot,
@@ -18,11 +19,15 @@ export default function useLists() {
 
     // Cross-tab sync
     useEffect(() => {
-        const onStorage = (e) => {
-            if (e.key === 'flickfindr-lists') setData(loadLists());
-        };
+        const reload = () => setData(loadLists());
+        const onStorage = (e) => { if (e.key === LISTS_KEY) reload(); };
+        const onCloudSync = (e) => { if (e.detail?.source === 'cloud') reload(); };
         window.addEventListener('storage', onStorage);
-        return () => window.removeEventListener('storage', onStorage);
+        window.addEventListener(LOCAL_SYNC_EVENT, onCloudSync);
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener(LOCAL_SYNC_EVENT, onCloudSync);
+        };
     }, []);
 
     const saveMovieToList = useCallback((listId, movie) => {
