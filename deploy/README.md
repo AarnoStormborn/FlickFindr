@@ -76,12 +76,19 @@ turn on magic-link sign-in and sync lists, search history and the concierge tran
 3. Set the same values in Vercel as `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY`, then redeploy the frontend — Vite embeds these at build
    time. Put the local values in `frontend/.env.local` and `backend/.env`.
-4. Run `DATABASE_URL=<supabase-url> npm run init:db` in `backend/` to create the
-   user-sync table and its RLS owner policy. If the developer machine cannot reach the
-   Supabase pooler, use **Actions → Migrate Supabase schema** and enter `MIGRATE
-   PRODUCTION`; it runs the same idempotent migration using the repository's
-   `SUPABASE_DATABASE_URL` secret. The authenticated API additionally scopes every
-   query to the verified token's user id.
+4. Create the user-sync table and its RLS owner policy. Prefer
+   `DATABASE_URL=<supabase-url> npm run init:db` in `backend/`. If the developer
+   machine cannot reach the pooler, use **Actions → Migrate Supabase schema** and enter
+   `MIGRATE PRODUCTION`; it runs the same idempotent migration using the repository's
+   `SUPABASE_DATABASE_URL` secret. **Currently blocked:** both local and Actions
+   migrations return `(ENOTFOUND) tenant/user postgres.<project-ref> not found`, so that
+   stored connection URL/credential needs to be refreshed or the table block below run
+   in Supabase → SQL Editor. The authenticated API additionally scopes every query to
+   the verified token's user id.
+
+   If both connections fail, copy and run
+   [`supabase/migrations/20261016_user_sync_data.sql`](../supabase/migrations/20261016_user_sync_data.sql)
+   in the Supabase SQL Editor.
 5. Test: `/account` → email magic link → open email → back to `/account`; guest lists,
    history and transcript merge into the account. The Account page shows sync status.
 
