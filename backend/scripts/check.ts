@@ -15,6 +15,7 @@ import { resolveAgentModel, getModelRuntime } from "../src/agent/runtime.js";
 import { config } from "../src/config.js";
 import { logger } from "../src/logger.js";
 import { EXPECTED_COLUMNS, assessCatalog } from "../src/services/health.js";
+import { supabaseAuthConfigured } from "../src/services/supabaseAuth.js";
 
 const STRICT = process.argv.includes("--strict");
 
@@ -24,7 +25,10 @@ function row<T>(rows: T[]): T | undefined {
 
 async function main(): Promise<void> {
   const warnings: string[] = [];
-  const report: Record<string, unknown> = { env: { dbPort: config.db.port, redis: config.redisUrl, port: config.port, agentEnabled: config.agent.enabled } };
+  const report: Record<string, unknown> = {
+    env: { dbPort: config.db.port, redis: config.redisUrl, port: config.port, agentEnabled: config.agent.enabled },
+    accounts: { configured: supabaseAuthConfigured() },
+  };
 
   // --- Database ---
   try {

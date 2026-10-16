@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { LOCAL_SYNC_EVENT, TRANSCRIPT_KEY, notifyLocalSyncChange } from '../lib/localSync';
 
 /**
  * Local-first concierge transcript.
@@ -12,8 +13,6 @@ import { useCallback, useState } from 'react';
  * it cannot grow without bound, and every storage call wrapped so a full or
  * unavailable store degrades to "no history" instead of breaking the page.
  */
-
-const TRANSCRIPT_KEY = 'flickfindr-concierge-transcript';
 
 /** Messages kept, not turns — one turn is a user message plus a reply. */
 const MAX_MESSAGES = 40;
@@ -66,6 +65,7 @@ export function loadTranscript() {
 function saveTranscript(messages) {
     try {
         localStorage.setItem(TRANSCRIPT_KEY, JSON.stringify(messages));
+        notifyLocalSyncChange();
     } catch {
         /* storage full / unavailable — ignore */
     }
@@ -77,6 +77,20 @@ function saveTranscript(messages) {
  */
 export default function useChatTranscript() {
     const [messages, setMessages] = useState(loadTranscript);
+
+    // Refresh the in-memory transcript after the sync layer restores cloud data
+    // into localStorage (or another tab changes it).
+    useEffect(() => {
+        const reload = () => setMessages(loadTranscript());
+        const storage = (e) => { if (e.key === TRANSCRIPT_KEY) reload(); };
+        const localSync = (e) => { if (e.detail?.source === 'cloud') reload(); };
+        window.addEventListener('storage', storage);
+        window.addEventListener(LOCAL_SYNC_EVENT, localSync);
+        return () => {
+            window.removeEventListener('storage', storage);
+            window.removeEventListener(LOCAL_SYNC_EVENT, localSync);
+        };
+    }, []);
 
     const update = useCallback((updater) => {
         setMessages((prev) => {

@@ -41,6 +41,9 @@ const databaseUrl =
 
 export const config = {
   databaseUrl,
+  // Public Supabase Auth settings. The anon key is public; never put service_role here.
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? "",
   db,
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6380",
   port: Number(process.env.PORT ?? 8001),

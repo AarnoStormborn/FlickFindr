@@ -304,9 +304,15 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   skipped: the quality is uneven (Shawshank's most recent review reads "very good movie
   9.5/10"), and a bad one-liner beside a film looks worse than showing nothing. User-written
   reviews would need accounts, which is the next item.
-- **Accounts + cloud sync** — move lists/history from localStorage to per-user
-  storage once multi-device use matters (the concierge transcript would move
-  with it).
+- **Accounts + cloud sync — in progress.** Supabase email magic-link auth; localStorage
+  remains the instant guest/offline cache; on first sign-in the existing lists, search
+  history and concierge transcript merge into a user-owned cloud snapshot. Subsequent
+  local changes sync up and another device pulls them. Backend verifies every bearer
+  token against Supabase and scopes reads/writes to that user; the sync table has RLS
+  and a foreign key to `auth.users`. Remaining deployment setup: `SUPABASE_URL` +
+  `SUPABASE_ANON_KEY` in Render, `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` in
+  Vercel, Supabase Auth's email provider + redirect URL allow-list, and the idempotent
+  `npm run init:db` migration against production.
 - **Watchlist notifications** — tell me when a saved film lands on a service.
 - **Coverage raise** — thresholds now sit a few points under the measured
   baseline; lift them as the untested pages/components (`SearchPage`,

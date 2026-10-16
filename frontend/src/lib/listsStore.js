@@ -8,7 +8,9 @@
  * instantly; opening a movie always fetches fresh detail.
  */
 
-const LISTS_KEY = 'flickfindr-lists';
+import { LISTS_KEY, notifyLocalSyncChange } from './localSync';
+
+export { LISTS_KEY };
 const DEFAULT_LIST_NAME = 'Watch later';
 export const WATCH_LATER_ID = 'watch-later';
 
@@ -49,6 +51,7 @@ export function loadLists() {
 function persist(data) {
     try {
         localStorage.setItem(LISTS_KEY, JSON.stringify(data));
+        notifyLocalSyncChange();
     } catch {
         /* storage full/unavailable — ignore */
     }

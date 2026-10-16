@@ -147,7 +147,11 @@ own query altogether.
 | GET | `/search/genres` | Genre facets |
 | GET | `/search/languages` | Language facets (`{code, count}`, most common first) |
 | GET | `/flicks/movie/:id/providers` | Where to watch (per-region Stream/Rent/Buy), cached in the DB |
+| GET | `/flicks/movie/:id/ratings` | IMDb / RT / Metacritic via OMDb, fetched on demand and cached (requires `OMDB_API_KEY`) |
 | GET | `/search/stats` | Rating/runtime extents, count |
+| GET | `/account/sync` | Get the signed-in user's cloud snapshot (Supabase Auth bearer token required) |
+| POST | `/account/sync/merge` | Merge guest local data into the signed-in account |
+| PUT | `/account/sync` | Save the signed-in user's cloud snapshot |
 
 Pagination bounds a page's **size**, not its **depth**. `MAX_PAGE_SIZE` (100) caps
 `limit` so that `limit=100000` cannot pull the whole table in one response;

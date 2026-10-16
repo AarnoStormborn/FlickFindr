@@ -1,0 +1,42 @@
+name: Migrate Supabase schema
+
+# Deliberate, manual schema migration. It uses the same database URL as the provider
+# refresh workflow so it can reach the Supabase pooler even when a developer network
+# cannot. init-db.ts is idempotent; the confirmation input makes the production write
+# explicit in the Actions UI.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type "MIGRATE PRODUCTION" to apply the idempotent schema migrations'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-schema-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.event.inputs.confirmation == 'MIGRATE PRODUCTION'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend
+        working-directory: backend
+        run: npm ci
+      - name: Apply idempotent migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: npm run init:db

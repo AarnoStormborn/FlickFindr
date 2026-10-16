@@ -7,13 +7,18 @@ import EraPage from './pages/EraPage';
 import MoodPage from './pages/MoodPage';
 import SearchPage from './pages/SearchPage';
 import ListsPage from './pages/ListsPage';
+import AccountPage from './pages/AccountPage';
 import ChatPage from './pages/ChatPage';
 import { ListsProvider } from './context/ListsContext';
+import { AuthProvider } from './context/AuthProvider';
+import { CloudSyncProvider } from './context/CloudSyncProvider';
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
+      <AuthProvider>
+      <CloudSyncProvider>
       <ListsProvider>
         <div className="app">
           <Navbar />
@@ -27,9 +32,12 @@ function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/lists" element={<ListsPage />} />
+            <Route path="/account" element={<AccountPage />} />
           </Routes>
         </div>
       </ListsProvider>
+      </CloudSyncProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

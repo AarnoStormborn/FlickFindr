@@ -60,6 +60,20 @@ describe('App routing', () => {
     await waitFor(() => expect(document.querySelector('.lists-title')).toHaveTextContent('My Lists'));
   });
 
+  it('routes to the account page and degrades to guest mode without Supabase config', async () => {
+    renderAt('/account');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /sync across devices/i })).toBeInTheDocument());
+    expect(screen.getByText(/not configured on this deployment/i)).toBeInTheDocument();
+  });
+
+  it('renders the account page in a config-safe guest state', async () => {
+    renderAt('/account');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /sync across devices/i })).toBeInTheDocument());
+    // CI and a fresh deployment have no Supabase anon key yet. The page explains
+    // that instead of crashing or pretending sign-in succeeded.
+    await waitFor(() => expect(screen.getByText(/not configured on this deployment/i)).toBeInTheDocument());
+  });
+
   it('renders the movie detail route', async () => {
     renderAt('/movie/1');
     await waitFor(() => expect(screen.getByText('Inception')).toBeInTheDocument());
