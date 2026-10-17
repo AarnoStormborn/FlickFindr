@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './authContext';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 
+function userFacingAuthError(error, fallback) {
+    const raw = error?.message ?? fallback;
+    if (error?.status === 429 || /rate.?limit|too many requests|email rate/i.test(raw)) {
+        return 'Email sign-in is being rate-limited. Try Google sign-in, wait before requesting another link, or configure custom SMTP.';
+    }
+    return raw;
+}
+
 export function AuthProvider({ children }) {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(supabaseConfigured);
@@ -34,6 +42,33 @@ export function AuthProvider({ children }) {
         };
     }, []);
 
+    const signInWithGoogle = useCallback(async () => {
+        setError(null);
+        if (!supabase) {
+            const message = 'Accounts are not configured on this deployment yet.';
+            setError(message);
+            return { ok: false, error: message };
+        }
+        try {
+            const { error: authError } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: `${window.location.origin}/account` },
+            });
+            if (authError) {
+                const message = userFacingAuthError(authError, 'Could not start Google sign-in.');
+                setError(message);
+                return { ok: false, error: message };
+            }
+            // Supabase redirects the browser to Google; a successful call normally
+            // does not return to this page until OAuth completes.
+            return { ok: true };
+        } catch (err) {
+            const message = userFacingAuthError(err, 'Could not start Google sign-in.');
+            setError(message);
+            return { ok: false, error: message };
+        }
+    }, []);
+
     const sendMagicLink = useCallback(async (email) => {
         setError(null);
         if (!supabase) {
@@ -47,12 +82,13 @@ export function AuthProvider({ children }) {
                 options: { emailRedirectTo: `${window.location.origin}/account` },
             });
             if (authError) {
-                setError(authError.message);
-                return { ok: false, error: authError.message };
+                const message = userFacingAuthError(authError, 'Could not send the sign-in link.');
+                setError(message);
+                return { ok: false, error: message };
             }
             return { ok: true };
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Could not send the sign-in link.';
+            const message = userFacingAuthError(err, 'Could not send the sign-in link.');
             setError(message);
             return { ok: false, error: message };
         }
@@ -82,8 +118,9 @@ export function AuthProvider({ children }) {
         loading,
         error,
         sendMagicLink,
+        signInWithGoogle,
         signOut,
-    }), [session, loading, error, sendMagicLink, signOut]);
+    }), [session, loading, error, sendMagicLink, signInWithGoogle, signOut]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

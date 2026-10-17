@@ -304,9 +304,13 @@ completeness; we are a decision-first concierge for a non-tech person on a couch
   skipped: the quality is uneven (Shawshank's most recent review reads "very good movie
   9.5/10"), and a bad one-liner beside a film looks worse than showing nothing. User-written
   reviews would need accounts, which is the next item.
-- **Accounts + cloud sync — in progress.** Supabase email magic-link auth; localStorage
-  remains the instant guest/offline cache; on first sign-in the existing lists, search
-  history and concierge transcript merge into a user-owned cloud snapshot. Subsequent
+- **Accounts + cloud sync — in progress.** Supabase **Google OAuth** as the primary
+  sign-in, with email magic link as a fallback; localStorage remains the instant
+  guest/offline cache; on first sign-in the existing lists, search history and
+  concierge transcript merge into a user-owned cloud snapshot. Supabase's built-in
+  email sender is only 2 links/hour/project (+ a 60s per-address cooldown), which is
+  likely the resend limit the viewer encountered; Google avoids that email quota.
+  Subsequent
   local changes sync up and another device pulls them. Backend verifies every bearer
   token against Supabase and scopes reads/writes to that user; the sync table has RLS
   and a foreign key to `auth.users`. Remaining deployment setup: `SUPABASE_URL` +
