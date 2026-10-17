@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './authContext';
-import { supabase, supabaseConfigured } from '../lib/supabase';
+import { supabase, supabaseConfigured, SUPABASE_GOOGLE_ENABLED } from '../lib/supabase';
 
 function userFacingAuthError(error, fallback) {
     const raw = error?.message ?? fallback;
@@ -49,6 +49,11 @@ export function AuthProvider({ children }) {
         setError(null);
         if (!supabase) {
             const message = 'Accounts are not configured on this deployment yet.';
+            setError(message);
+            return { ok: false, error: message };
+        }
+        if (!SUPABASE_GOOGLE_ENABLED) {
+            const message = 'Google sign-in is not enabled on this deployment yet. Use the email link for now.';
             setError(message);
             return { ok: false, error: message };
         }
@@ -116,6 +121,7 @@ export function AuthProvider({ children }) {
 
     const value = useMemo(() => ({
         configured: supabaseConfigured,
+        googleEnabled: SUPABASE_GOOGLE_ENABLED,
         session,
         user: session?.user ?? null,
         loading,

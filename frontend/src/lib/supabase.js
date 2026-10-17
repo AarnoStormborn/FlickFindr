@@ -15,6 +15,7 @@ function runtimeValue(key) {
 
 export const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || runtimeValue('supabaseUrl');
 export const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || runtimeValue('supabaseAnonKey');
+export const SUPABASE_GOOGLE_ENABLED = import.meta.env?.VITE_SUPABASE_GOOGLE_ENABLED === 'true' || runtimeValue('supabaseGoogleEnabled') === true;
 export const supabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 export const supabase = supabaseConfigured
