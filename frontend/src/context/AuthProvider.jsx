@@ -4,6 +4,9 @@ import { supabase, supabaseConfigured } from '../lib/supabase';
 
 function userFacingAuthError(error, fallback) {
     const raw = error?.message ?? fallback;
+    if (/unsupported provider|provider is not enabled/i.test(raw)) {
+        return 'Google sign-in is not enabled in Supabase yet. Use the email link for now.';
+    }
     if (error?.status === 429 || /rate.?limit|too many requests|email rate/i.test(raw)) {
         return 'Email sign-in is being rate-limited. Try Google sign-in, wait before requesting another link, or configure custom SMTP.';
     }

@@ -51,6 +51,14 @@ describe('AccountPage', () => {
         expect(authValue.signInWithGoogle).toHaveBeenCalledOnce();
     });
 
+    it('shows a clear fallback message when Google is not enabled in Supabase', async () => {
+        const user = userEvent.setup();
+        renderAccount({ auth: { signInWithGoogle: vi.fn(async () => ({ ok: false, error: 'Google sign-in is not enabled in Supabase yet. Use the email link for now.' })) } });
+        await user.click(screen.getByRole('button', { name: /continue with google/i }));
+        expect(await screen.findByRole('alert')).toHaveTextContent(/not enabled in Supabase/i);
+        expect(screen.getByRole('button', { name: /email me a sign-in link/i })).toBeInTheDocument();
+    });
+
     it('sends the link and confirms which email to check', async () => {
         const user = userEvent.setup();
         const { authValue } = renderAccount();
