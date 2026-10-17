@@ -13,6 +13,7 @@ function renderAccount({ auth = {}, sync = {} } = {}) {
         loading: false,
         error: null,
         sendMagicLink: vi.fn(async () => ({ ok: true })),
+        signInWithGoogle: vi.fn(async () => ({ ok: true })),
         signOut: vi.fn(async () => ({ ok: true })),
         ...auth,
     };
@@ -37,8 +38,17 @@ describe('AccountPage', () => {
         renderAccount();
         expect(screen.getByRole('heading', { name: /sync across devices/i })).toBeInTheDocument();
         expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /email me a sign-in link/i })).toBeInTheDocument();
-        expect(screen.getByText(/keep browsing as a guest/i)).toBeInTheDocument();
+        expect(screen.getByText(/browsing stays available as a guest/i)).toBeInTheDocument();
+        expect(screen.getByText(/2 links per hour per project/i)).toBeInTheDocument();
+    });
+
+    it('starts Google OAuth when requested', async () => {
+        const user = userEvent.setup();
+        const { authValue } = renderAccount();
+        await user.click(screen.getByRole('button', { name: /continue with google/i }));
+        expect(authValue.signInWithGoogle).toHaveBeenCalledOnce();
     });
 
     it('sends the link and confirms which email to check', async () => {

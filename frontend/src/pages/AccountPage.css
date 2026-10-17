@@ -38,6 +38,50 @@
     line-height: 1.65;
 }
 
+.account-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 16px;
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 999px;
+    color: #202124;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: box-shadow var(--transition-fast), opacity var(--transition-fast);
+}
+
+.account-google:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.account-google:disabled {
+    cursor: wait;
+    opacity: 0.6;
+}
+
+.account-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin: var(--space-lg) 0;
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.account-divider::before,
+.account-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line-subtle);
+}
+
 .account-form {
     display: grid;
     gap: var(--space-sm);

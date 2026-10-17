@@ -65,18 +65,24 @@ Browser
 ## 3. Accounts + cloud sync (Supabase Auth)
 
 Accounts are optional: film discovery and guest/local mode work without them. To
-turn on magic-link sign-in and sync lists, search history and the concierge transcript:
+turn on Google or magic-link sign-in and sync lists, search history and the concierge
+transcript:
 
 1. In Supabase → **Authentication → URL Configuration**, set the Site URL to the
    production frontend (`https://flick-findr-zeta.vercel.app`) and allow that URL's
    `/account` path plus `http://localhost:5173/account` for local development. Add
    Vercel preview URLs if you want to test auth on previews.
-2. Copy the project URL and the **anon / publishable** key (not `service_role`). Set
+2. For Google sign-in, create a Google OAuth client in Google Cloud Console. Add the
+   callback URL shown by Supabase under **Authentication → Sign In / Providers →
+   Google** (normally `https://<project-ref>.supabase.co/auth/v1/callback`) to the
+   Google client's authorized redirect URIs, then paste the Google client ID and secret
+   into Supabase's Google provider settings. Magic-link email remains as a fallback.
+3. Copy the project URL and the **anon / publishable** key (not `service_role`). Set
    them in Render as `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
-3. Set the same values in Vercel as `VITE_SUPABASE_URL` and
+4. Set the same values in Vercel as `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY`, then redeploy the frontend — Vite embeds these at build
    time. Put the local values in `frontend/.env.local` and `backend/.env`.
-4. Create the user-sync table and its RLS owner policy. Prefer
+5. Create the user-sync table and its RLS owner policy. Prefer
    `DATABASE_URL=<supabase-url> npm run init:db` in `backend/`. If the developer
    machine cannot reach the pooler, use **Actions → Migrate Supabase schema** and enter
    `MIGRATE PRODUCTION`; it runs the same idempotent migration using the repository's
@@ -89,12 +95,14 @@ turn on magic-link sign-in and sync lists, search history and the concierge tran
    If both connections fail, copy and run
    [`supabase/migrations/20261016_user_sync_data.sql`](../supabase/migrations/20261016_user_sync_data.sql)
    in the Supabase SQL Editor.
-5. Test: `/account` → email magic link → open email → back to `/account`; guest lists,
+6. Test: `/account` → Google or email magic link → return to `/account`; guest lists,
    history and transcript merge into the account. The Account page shows sync status.
 
-If the Supabase Auth email provider is still on its default low rate limit, configure
-SMTP before inviting broad use. The sync data is private to the user and is never read
-from the browser by a service-role key.
+The built-in Supabase email sender is limited to **2 emails/hour per project** by
+default (plus a 60-second resend cooldown per address). This is why Google is the
+primary button and magic link is the fallback; configure custom SMTP if email sign-in
+will be used broadly. The sync data is private to the user and is never read from the
+browser by a service-role key.
 
 ## 4. Vercel (frontend)
 
