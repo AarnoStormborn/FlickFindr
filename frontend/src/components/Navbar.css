@@ -19,6 +19,7 @@
 }
 
 .navbar-container {
+    position: relative;
     max-width: 1600px;
     height: 100%;
     margin: 0 auto;
@@ -107,6 +108,10 @@
     gap: var(--space-sm);
 }
 
+.navbar-account-menu-item {
+    display: none;
+}
+
 .navbar-account-link {
     color: var(--text-secondary);
     font-size: var(--font-size-sm);
@@ -118,6 +123,25 @@
 .navbar-account-link:hover,
 .navbar-account-link.active {
     color: var(--accent-gold);
+}
+
+.navbar-menu-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--line-subtle);
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.navbar-menu-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 .navbar-search-btn {
@@ -169,11 +193,62 @@
         width: calc(100% - 16px);
     }
 
+    .navbar-container {
+        padding: 0 var(--space-md);
+    }
+
+    /* Keep the top bar compact, but make every primary route one tap away. */
     .navbar-menu {
         display: none;
     }
 
-    .navbar-container {
-        padding: 0 var(--space-md);
+    .navbar-menu.is-open {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        margin: 0;
+        padding: 8px;
+        background: linear-gradient(180deg, rgba(22, 22, 28, 0.97), rgba(14, 14, 18, 0.98));
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border: 1px solid var(--line-subtle);
+        border-radius: var(--panel-radius);
+        box-shadow: var(--shadow-md);
+    }
+
+    .navbar-menu .navbar-item {
+        width: 100%;
+    }
+
+    .navbar-menu .navbar-link {
+        display: block;
+        padding: 12px 14px;
+        font-size: 0.8rem;
+        letter-spacing: 0.1em;
+    }
+
+    .navbar-menu .navbar-link.active::after {
+        left: auto;
+        right: 14px;
+        bottom: 50%;
+        transform: translateY(50%);
+    }
+
+    .navbar-account-menu-item {
+        display: block;
+    }
+
+    .navbar-account-link {
+        display: none;
+    }
+
+    .navbar-menu-toggle {
+        display: flex;
+        flex: 0 0 38px;
     }
 }
