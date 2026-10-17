@@ -65,6 +65,12 @@
     opacity: 0.6;
 }
 
+.account-provider-notice {
+    margin: 0 0 var(--space-md);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
 .account-divider {
     display: flex;
     align-items: center;

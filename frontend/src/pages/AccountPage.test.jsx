@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,7 @@ import { CloudSyncContext } from '../context/cloudSyncContext';
 function renderAccount({ auth = {}, sync = {} } = {}) {
     const authValue = {
         configured: true,
+        googleEnabled: false,
         user: null,
         loading: false,
         error: null,
@@ -38,7 +39,8 @@ describe('AccountPage', () => {
         renderAccount();
         expect(screen.getByRole('heading', { name: /sync across devices/i })).toBeInTheDocument();
         expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /continue with google/i })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /continue with google/i })).toBeNull();
+        expect(screen.getByText(/google sign-in is being set up/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /email me a sign-in link/i })).toBeInTheDocument();
         expect(screen.getByText(/browsing stays available as a guest/i)).toBeInTheDocument();
         expect(screen.getByText(/2 links per hour per project/i)).toBeInTheDocument();
@@ -46,14 +48,14 @@ describe('AccountPage', () => {
 
     it('starts Google OAuth when requested', async () => {
         const user = userEvent.setup();
-        const { authValue } = renderAccount();
+        const { authValue } = renderAccount({ auth: { googleEnabled: true } });
         await user.click(screen.getByRole('button', { name: /continue with google/i }));
         expect(authValue.signInWithGoogle).toHaveBeenCalledOnce();
     });
 
     it('shows a clear fallback message when Google is not enabled in Supabase', async () => {
         const user = userEvent.setup();
-        renderAccount({ auth: { signInWithGoogle: vi.fn(async () => ({ ok: false, error: 'Google sign-in is not enabled in Supabase yet. Use the email link for now.' })) } });
+        renderAccount({ auth: { googleEnabled: true, signInWithGoogle: vi.fn(async () => ({ ok: false, error: 'Google sign-in is not enabled in Supabase yet. Use the email link for now.' })) } });
         await user.click(screen.getByRole('button', { name: /continue with google/i }));
         expect(await screen.findByRole('alert')).toHaveTextContent(/not enabled in Supabase/i);
         expect(screen.getByRole('button', { name: /email me a sign-in link/i })).toBeInTheDocument();
@@ -65,7 +67,7 @@ describe('AccountPage', () => {
         await user.type(screen.getByLabelText(/email address/i), 'viewer@example.com');
         await user.click(screen.getByRole('button', { name: /email me a sign-in link/i }));
         expect(authValue.sendMagicLink).toHaveBeenCalledWith('viewer@example.com');
-        expect(await screen.findByRole('status')).toHaveTextContent('Check viewer@example.com for your sign-in link.');
+        await waitFor(() => expect(document.querySelector('.account-success')).toHaveTextContent('Check viewer@example.com for your sign-in link.'));
     });
 
     it('shows account and sync state when signed in', () => {

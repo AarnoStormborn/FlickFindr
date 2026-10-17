@@ -81,7 +81,9 @@ transcript:
    them in Render as `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 4. Set the same values in Vercel as `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY`, then redeploy the frontend — Vite embeds these at build
-   time. Put the local values in `frontend/.env.local` and `backend/.env`.
+   time. Set `VITE_SUPABASE_GOOGLE_ENABLED=true` **only after** the Google provider is
+   enabled in Supabase; until then the button stays hidden and the email fallback
+   remains available. Put local values in `frontend/.env.local` and `backend/.env`.
 5. Create the user-sync table and its RLS owner policy. Prefer
    `DATABASE_URL=<supabase-url> npm run init:db` in `backend/`. If the developer
    machine cannot reach the pooler, use **Actions → Migrate Supabase schema** and enter
@@ -99,9 +101,11 @@ transcript:
    history and transcript merge into the account. The Account page shows sync status.
 
 The built-in Supabase email sender is limited to **2 emails/hour per project** by
-default (plus a 60-second resend cooldown per address). This is why Google is the
-primary button and magic link is the fallback; configure custom SMTP if email sign-in
-will be used broadly. The sync data is private to the user and is never read from the
+default (plus a 60-second resend cooldown per address). Google is the preferred path
+because it avoids that email quota; configure custom SMTP if email sign-in will be used
+broadly. The Google button is feature-flagged because production testing confirmed the
+provider is currently disabled in Supabase (clicking it otherwise navigates to a raw
+Supabase 400 page). The sync data is private to the user and is never read from the
 browser by a service-role key.
 
 ## 4. Vercel (frontend)
